@@ -1,0 +1,47 @@
+{
+  "orders": {
+    "A-100": {
+      "orderId": "A-100",
+      "status": "PROCESSING",
+      "paymentStatus": "PAID",
+      "updatedAt": "2026-08-28T10:15:00+09:00"
+    },
+    "A-200": {
+      "orderId": "A-200",
+      "status": "CANCELLED",
+      "paymentStatus": "REFUNDED",
+      "updatedAt": "2026-08-27T16:40:00+09:00"
+    }
+  },
+  "inventory": {
+    "SKU-RED-01": {
+      "sku": "SKU-RED-01",
+      "available": 4,
+      "reserved": 2,
+      "updatedAt": "2026-08-28T10:10:00+09:00"
+    },
+    "SKU-BLUE-02": {
+      "sku": "SKU-BLUE-02",
+      "available": 0,
+      "reserved": 1,
+      "updatedAt": "2026-08-28T10:10:00+09:00"
+    }
+  },
+  "shipments": {
+    "A-100": {
+      "orderId": "A-100",
+      "status": "DELIVERED",
+      "carrier": "Demo Parcel",
+      "estimatedDelivery": "2026-08-29",
+      "updatedAt": "2026-08-28T10:12:00+09:00"
+    },
+    "A-200": {
+      "orderId": "A-200",
+      "status": "NOT_CREATED",
+      "carrier": null,
+      "estimatedDelivery": null,
+      "updatedAt": "2026-08-27T16:40:00+09:00"
+    }
+  }
+}
+

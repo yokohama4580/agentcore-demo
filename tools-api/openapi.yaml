@@ -1,0 +1,62 @@
+openapi: 3.0.3
+info:
+  title: Demo Order Operations API
+  version: 1.0.0
+  description: Fixture-only REST API for the AgentCore support agent demo.
+paths:
+  /orders/{orderId}:
+    get:
+      operationId: getOrderStatus
+      summary: Get the order-management processing status
+      description: Returns the order lifecycle state from the order-management system, not carrier delivery state.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order status
+          content:
+            application/json:
+              schema:
+                type: object
+  /inventory/{sku}:
+    get:
+      operationId: getInventory
+      summary: Get available inventory
+      description: Returns available and reserved stock for a SKU.
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Inventory status
+          content:
+            application/json:
+              schema:
+                type: object
+  /shipments/{orderId}:
+    get:
+      operationId: getShipmentStatus
+      summary: Get the carrier-side delivery status
+      description: Returns shipment and delivery state from the carrier feed, not order-management processing state.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Shipment status
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  parameters:
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Z]-[0-9]{3}$"
+

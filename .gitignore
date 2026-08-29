@@ -1,0 +1,12 @@
+node_modules/
+cdk.out/
+.venv/
+__pycache__/
+*.pyc
+.demo.env
+.demo-state/
+.pytest_cache/
+coverage/
+TASK.md
+
+.demo.env.bak-*

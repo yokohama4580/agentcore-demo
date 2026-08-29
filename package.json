@@ -1,0 +1,30 @@
+{
+  "name": "agentcore-support-demo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit",
+    "format:check": "prettier --check \"infra/**/*.ts\" \"*.json\"",
+    "test": "tsx --test infra/test/*.test.ts && python3 -m unittest discover -s tests -p 'test_*.py'",
+    "cdk": "cdk",
+    "synth": "cdk synth --strict",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy AgentCoreSupportDemo --strict --require-approval never",
+    "destroy": "cdk destroy AgentCoreSupportDemo --force"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.267.0",
+    "cdk-nag": "^2.37.55",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "aws-cdk": "2.1126.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

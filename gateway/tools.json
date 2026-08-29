@@ -1,0 +1,25 @@
+{
+  "targetName": "order-operations-api",
+  "source": "API Gateway REST API",
+  "authentication": "AWS_IAM",
+  "tools": [
+    {
+      "name": "inspect_order_lifecycle",
+      "method": "GET",
+      "path": "/orders/{orderId}",
+      "intendedUse": "order lifecycle, processing, payment, cancellation"
+    },
+    {
+      "name": "lookup_inventory",
+      "method": "GET",
+      "path": "/inventory/{sku}",
+      "intendedUse": "available and reserved stock"
+    },
+    {
+      "name": "lookup_order_shipment_status",
+      "method": "GET",
+      "path": "/shipments/{orderId}",
+      "intendedUse": "carrier delivery state and ETA"
+    }
+  ]
+}

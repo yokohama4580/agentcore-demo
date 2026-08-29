@@ -1,0 +1,41 @@
+{
+  "harnessName": "AgentCoreSupportDemo",
+  "model": {
+    "bedrockModelConfig": {
+      "modelId": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "apiFormat": "converse_stream",
+      "maxTokens": 1024,
+      "temperature": 0.2
+    }
+  },
+  "systemPrompt": [
+    {
+      "text": "You are a customer support agent for a fictional ecommerce order service. Answer in Japanese. Use tools for operational facts, cite the returned source, and never invent missing values."
+    }
+  ],
+  "tools": [
+    {
+      "type": "agentcore_gateway",
+      "name": "order_operations",
+      "config": {
+        "agentCoreGateway": {
+          "gatewayArn": "${GATEWAY_ARN}",
+          "outboundAuth": {
+            "awsIam": {}
+          }
+        }
+      }
+    }
+  ],
+  "memory": {
+    "managedMemoryConfiguration": {
+      "strategies": ["SEMANTIC", "SUMMARIZATION"],
+      "eventExpiryDuration": 3
+    }
+  },
+  "limits": {
+    "maxIterations": 8,
+    "maxTokens": 2048,
+    "timeoutSeconds": 120
+  }
+}
