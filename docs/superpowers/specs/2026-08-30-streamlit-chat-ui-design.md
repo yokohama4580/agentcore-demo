@@ -43,15 +43,21 @@ tests/test_chat_events.py    harness_client の単体テスト
 
 これにより 5 本のステップスクリプト、`measure_wrong_tool.py`、既存テストは変更なしで通ります。
 
-### `iter_stream_events` が yield するイベント
+### `iter_stream_events` が yield するイベント（内部契約）
 
 | type | フィールド |
 | --- | --- |
 | `text` | `text`（差分） |
-| `tool_use` | `name`, `input`（JSON 化に失敗したら生文字列） |
-| `tool_result` | `status`, `content` |
+| `tool_use_start` | `name`, `toolUseId` |
+| `tool_use_delta` | `fragment`（引数 JSON の断片） |
+| `tool_use` | `block`（`name` / `input` / `toolUseId`。`input` は JSON 化に失敗したら生文字列） |
+| `tool_result_start` | `status`, `toolUseId` |
+| `tool_result_delta` | `content` |
+| `tool_result` | `block`（`status` / `content` / `toolUseId`） |
 | `metadata` | `usage`, `serviceLatencyMs` |
 | `stop` | `stopReason` |
+
+`*_start` と `*_delta` は `parse_stream` が CLI の逐次表示を再現するために必要です（現行の `[toolUse] <name>` ラベルは引数が届く前に出るため）。UI 側はこれらを無視します。
 
 `error` はジェネレータからは投げっぱなし（`RuntimeError`）にし、UI 向けの `error` イベントへの変換は `harness_client` 側で行います。CLI の既存挙動を変えないためです。
 
@@ -75,12 +81,14 @@ yield するのは次の 5 種類だけです。UI はこの契約だけを知�
 | type | 中身 |
 | --- | --- |
 | `text` | 応答テキストの差分 |
-| `tool_use` | `{name, input}` |
-| `tool_result` | `{status, content}` |
+| `tool_use` | `{toolUseId, name, input}` |
+| `tool_result` | `{toolUseId, status, content}` |
 | `done` | `{firstTokenMs, elapsedMs, usage}` |
 | `error` | `{message}`。これを yield したら打ち切る |
 
-`session_id` が 33 文字未満なら送信前に `ValueError` にします（`runtimeSessionId` の下限）。
+`toolUseId` を含めるのは、1 ターンで複数のツールが呼ばれるとき（Step 2 は 3 つ）に `tool_result` を正しい `tool_use` へ結び付けるためです。実測のストリームでは toolUse が 3 件続いたあとに toolResult が 3 件届くので、名前や到着順での対応付けはできません。
+
+`session_id` が 33 文字未満なら送信前に `ValueError` にします（`runtimeSessionId` の下限）。`actor_id` は既存スクリプトに合わせて `chat-{session_id}` を UI 側で組み立てて渡します。
 
 CloudWatch へのメトリクス送信と ADOT 計装は UI 経路では行いません。UI はデモの見せ方であり、計測系は既存スクリプトの担当だからです。
 
@@ -96,7 +104,7 @@ CloudWatch へのメトリクス送信と ADOT 計装は UI 経路では行い�
 `blocks` は順序付きのリストで、要素は次のいずれかです。
 
 - `{"kind": "text", "text": str}`
-- `{"kind": "tool", "name": str, "input": Any, "status": str | None, "content": Any}`
+- `{"kind": "tool", "toolUseId": str, "name": str, "input": Any, "status": str | None, "content": Any}`
 - `{"kind": "metrics", "firstTokenMs": int, "elapsedMs": int, "usage": dict}`
 
 Streamlit は操作ごとにスクリプトを再実行するため、テキストとツール呼び出しの出現順を履歴で再現するには構造として保持する必要があります。
