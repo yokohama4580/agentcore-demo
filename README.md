@@ -48,6 +48,16 @@ cp .demo.env.example .demo.env
 ./scripts/teardown.sh
 ```
 
+### チャット画面から使う
+
+スクリプトの代わりに、ブラウザのチャット画面から同じ Harness と会話できます。AWS リソースは追加しません。
+
+```bash
+./scripts/chat.sh
+```
+
+`http://127.0.0.1:8787` が開きます。応答のストリーミング、ツール呼び出しの引数と結果、レイテンシとトークン数、モデルの切り替え、session ID の表示と「新しい会話」でのリセットができます。
+
 各スクリプトは引数も対話入力も取りません。
 
 ### 誤爆防止（承認済みターゲット）
@@ -95,9 +105,11 @@ observability/        invoke runner、READY 待機、トレース表示、teardo
 scripts/
   common.sh           承認済みターゲット確認、見出し、前提チェック
   setup.sh            依存インストール → テスト → CDK deploy → READY 待機
+  chat.sh             チャット画面を起動する（Streamlit・ローカルのみ）
   step1-basic.sh 〜 step5-traces.sh
   measure-wrong-tool.sh  Step 3 の再現率を N 回試行して測る
   teardown.sh         削除と残存 0 件の検証
+chatui/               チャット画面（Streamlit アプリと Harness クライアント）
 infra/                TypeScript CDK app とテスト
 tests/                ストリーム解析、handler、トレース表示の単体テスト
 .demo.env.example     設定テンプレート（実値は git 管理外の .demo.env に置く）

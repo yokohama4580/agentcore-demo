@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -48,22 +48,11 @@ def _print_json(value: Any) -> str:
     return json.dumps(_jsonable(value), ensure_ascii=False, separators=(",", ":"))
 
 
-def parse_stream(
+def iter_stream_events(
     events: Iterable[dict[str, Any]],
-    *,
-    emit: bool = True,
-    started_monotonic: float | None = None,
-) -> dict[str, Any]:
-    started = started_monotonic or time.monotonic()
-    text_parts: list[str] = []
+) -> Iterator[dict[str, Any]]:
+    """AgentCore のイベントストリームを、扱いやすい形に正規化して逐次 yield します。"""
     blocks: dict[int, dict[str, Any]] = {}
-    tool_uses: list[dict[str, Any]] = []
-    tool_results: list[dict[str, Any]] = []
-    usage: dict[str, int] = {}
-    service_latency_ms: int | None = None
-    first_token_ms: int | None = None
-    stop_reason: str | None = None
-    answer_started = False
 
     for event in events:
         error_name = next((name for name in ERROR_EVENTS if name in event), None)
@@ -82,8 +71,11 @@ def parse_stream(
                     "inputText": "",
                 }
                 blocks[index] = block
-                if emit:
-                    print(f"\n[toolUse] {block['name']}", flush=True)
+                yield {
+                    "type": "tool_use_start",
+                    "name": block.get("name", "unknown"),
+                    "toolUseId": block.get("toolUseId"),
+                }
             elif "toolResult" in start:
                 block = {
                     "kind": "toolResult",
@@ -91,11 +83,11 @@ def parse_stream(
                     "content": [],
                 }
                 blocks[index] = block
-                if emit:
-                    print(
-                        f"\n[toolResult] status={block.get('status', 'unknown')}",
-                        flush=True,
-                    )
+                yield {
+                    "type": "tool_result_start",
+                    "status": block.get("status"),
+                    "toolUseId": block.get("toolUseId"),
+                }
             continue
 
         if "contentBlockDelta" in event:
@@ -104,15 +96,7 @@ def parse_stream(
             delta = payload.get("delta", {})
 
             if "text" in delta:
-                if first_token_ms is None:
-                    first_token_ms = round((time.monotonic() - started) * 1000)
-                text = delta["text"]
-                text_parts.append(text)
-                if emit:
-                    if not answer_started:
-                        print("\n[answer]", flush=True)
-                        answer_started = True
-                    print(text, end="", flush=True)
+                yield {"type": "text", "text": delta["text"]}
 
             if "toolUse" in delta:
                 block = blocks.setdefault(
@@ -121,8 +105,7 @@ def parse_stream(
                 )
                 fragment = delta["toolUse"].get("input", "")
                 block["inputText"] += fragment
-                if emit:
-                    print(fragment, end="", flush=True)
+                yield {"type": "tool_use_delta", "fragment": fragment}
 
             if "toolResult" in delta:
                 block = blocks.setdefault(
@@ -131,8 +114,7 @@ def parse_stream(
                 )
                 content = _jsonable(delta["toolResult"])
                 block["content"].extend(content)
-                if emit:
-                    print(_print_json(content), flush=True)
+                yield {"type": "tool_result_delta", "content": content}
             continue
 
         if "contentBlockStop" in event:
@@ -146,21 +128,81 @@ def parse_stream(
                     block["input"] = json.loads(input_text)
                 except json.JSONDecodeError:
                     block["input"] = input_text
-                tool_uses.append(block)
-                if emit:
-                    print("", flush=True)
+                yield {"type": "tool_use", "block": block}
             elif block["kind"] == "toolResult":
-                tool_results.append(block)
+                yield {"type": "tool_result", "block": block}
             continue
 
         if "messageStop" in event:
-            stop_reason = event["messageStop"].get("stopReason")
+            yield {
+                "type": "stop",
+                "stopReason": event["messageStop"].get("stopReason"),
+            }
             continue
 
         if "metadata" in event:
             metadata = event["metadata"]
-            usage = _jsonable(metadata.get("usage", {}))
-            service_latency_ms = metadata.get("metrics", {}).get("latencyMs")
+            yield {
+                "type": "metadata",
+                "usage": _jsonable(metadata.get("usage", {})),
+                "serviceLatencyMs": metadata.get("metrics", {}).get("latencyMs"),
+            }
+
+
+def parse_stream(
+    events: Iterable[dict[str, Any]],
+    *,
+    emit: bool = True,
+    started_monotonic: float | None = None,
+) -> dict[str, Any]:
+    started = started_monotonic or time.monotonic()
+    text_parts: list[str] = []
+    tool_uses: list[dict[str, Any]] = []
+    tool_results: list[dict[str, Any]] = []
+    usage: dict[str, int] = {}
+    service_latency_ms: int | None = None
+    first_token_ms: int | None = None
+    stop_reason: str | None = None
+    answer_started = False
+
+    for event in iter_stream_events(events):
+        kind = event["type"]
+
+        if kind == "text":
+            if first_token_ms is None:
+                first_token_ms = round((time.monotonic() - started) * 1000)
+            text_parts.append(event["text"])
+            if emit:
+                if not answer_started:
+                    print("\n[answer]", flush=True)
+                    answer_started = True
+                print(event["text"], end="", flush=True)
+        elif kind == "tool_use_start":
+            if emit:
+                print(f"\n[toolUse] {event['name']}", flush=True)
+        elif kind == "tool_use_delta":
+            if emit:
+                print(event["fragment"], end="", flush=True)
+        elif kind == "tool_use":
+            tool_uses.append(event["block"])
+            if emit:
+                print("", flush=True)
+        elif kind == "tool_result_start":
+            if emit:
+                print(
+                    f"\n[toolResult] status={event['status'] or 'unknown'}",
+                    flush=True,
+                )
+        elif kind == "tool_result_delta":
+            if emit:
+                print(_print_json(event["content"]), flush=True)
+        elif kind == "tool_result":
+            tool_results.append(event["block"])
+        elif kind == "stop":
+            stop_reason = event["stopReason"]
+        elif kind == "metadata":
+            usage = event["usage"]
+            service_latency_ms = event["serviceLatencyMs"]
 
     if emit and answer_started:
         print("", flush=True)
