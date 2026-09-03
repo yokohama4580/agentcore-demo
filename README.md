@@ -48,9 +48,33 @@ cp .demo.env.example .demo.env
 ./scripts/teardown.sh
 ```
 
-### チャット画面から使う
+### デモ UI から使う（プレゼン向け・推奨）
 
-スクリプトの代わりに、ブラウザのチャット画面から同じ Harness と会話できます。AWS リソースは追加しません。
+Step 1〜4 をブラウザだけで見せられる 2 ペインのデモ画面です。AWS リソースは追加しません。
+
+```bash
+./scripts/ui.sh
+```
+
+`http://127.0.0.1:8788` を開きます。
+
+- **左ペイン（顧客に見える画面）**: 架空の注文管理 SaaS「Asagao」の AI アシスタント。
+  ストリーミング応答・定型質問チップ・自由入力
+- **右ペイン（運用ビュー）**: 同じターンの裏側。モデル・ツール呼び出しの引数と結果・
+  所要時間・first-token / total レイテンシ・in/out トークン・ターン比較テーブル。
+  「裏側を隠す」で閉じられるので、「左は自然な回答に見える → 右を開くと誤ツール」という
+  見せ方ができる
+- **ヘッダー**: モデルの切り替え（呼び出し時 override。Harness version は変わらない）、
+  session ID 表示、「新しい会話」、⚙ から Step 3 の誤ルーティング規則の注入トグル
+- **右下**: CloudWatch GenAI Observability と AgentCore Evaluations へのコンソールリンク
+
+**Step 3（誤ツール選択）を再現するときは、必ず「新しい会話」で始めること。**
+同一セッションの続きで質問すると、Memory に残った直前の回答から答えてしまい
+ツール自体が呼ばれない（これ自体が Memory が効いている証拠でもある）。
+
+フロントエンドを変更したら `UI_REBUILD=1 ./scripts/ui.sh` で再ビルドできます。
+
+### チャット画面から使う（Streamlit・簡易版）
 
 ```bash
 ./scripts/chat.sh
@@ -105,11 +129,14 @@ observability/        invoke runner、READY 待機、トレース表示、teardo
 scripts/
   common.sh           承認済みターゲット確認、見出し、前提チェック
   setup.sh            依存インストール → テスト → CDK deploy → READY 待機
+  ui.sh               デモ UI を起動する（ビルド + FastAPI。ローカルのみ）
   chat.sh             チャット画面を起動する（Streamlit・ローカルのみ）
   step1-basic.sh 〜 step5-traces.sh
   measure-wrong-tool.sh  Step 3 の再現率を N 回試行して測る
   teardown.sh         削除と残存 0 件の検証
 chatui/               チャット画面（Streamlit アプリと Harness クライアント）
+frontend/             デモ UI のフロントエンド（Vite + React。ビルド成果物は dist/）
+server/               デモ UI のバックエンド（FastAPI。InvokeHarness を SSE に変換）
 infra/                TypeScript CDK app とテスト
 tests/                ストリーム解析、handler、トレース表示の単体テスト
 .demo.env.example     設定テンプレート（実値は git 管理外の .demo.env に置く）

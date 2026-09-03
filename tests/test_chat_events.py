@@ -138,14 +138,21 @@ class StreamTurnTest(unittest.TestCase):
         events, _ = self._invoke(sample_events())
 
         types = [event["type"] for event in events]
-        self.assertEqual(types, ["tool_use", "tool_result", "text", "text", "done"])
+        self.assertEqual(
+            types,
+            ["tool_use_start", "tool_use", "tool_result", "text", "text", "done"],
+        )
 
-        tool_use = events[0]
+        tool_use_start = events[0]
+        self.assertEqual(tool_use_start["name"], "inspect_order_lifecycle")
+        self.assertEqual(tool_use_start["toolUseId"], "t-1")
+
+        tool_use = events[1]
         self.assertEqual(tool_use["name"], "inspect_order_lifecycle")
         self.assertEqual(tool_use["toolUseId"], "t-1")
         self.assertEqual(tool_use["input"], {"orderId": "A-100"})
 
-        tool_result = events[1]
+        tool_result = events[2]
         self.assertEqual(tool_result["toolUseId"], "t-1")
         self.assertEqual(tool_result["status"], "success")
 

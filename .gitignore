@@ -10,3 +10,4 @@ coverage/
 TASK.md
 
 .demo.env.bak-*
+frontend/dist/

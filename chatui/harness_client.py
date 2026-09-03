@@ -58,6 +58,7 @@ def build_request(
     model_id: str | None,
     harness_arn: str,
     actor_id: str,
+    system_prompt: str | None = None,
 ) -> dict[str, Any]:
     request: dict[str, Any] = {
         "harnessArn": harness_arn,
@@ -76,6 +77,8 @@ def build_request(
                 "temperature": MODEL_TEMPERATURE,
             }
         }
+    if system_prompt:
+        request["systemPrompt"] = [{"text": system_prompt}]
     return request
 
 
@@ -88,6 +91,7 @@ def stream_turn(
     profile: str,
     region: str,
     actor_id: str,
+    system_prompt: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """1 ターン分の応答を text / tool_use / tool_result / done / error として yield します。"""
     if len(session_id) < MIN_SESSION_ID_LENGTH:
@@ -101,6 +105,7 @@ def stream_turn(
         model_id=model_id,
         harness_arn=harness_arn,
         actor_id=actor_id,
+        system_prompt=system_prompt,
     )
 
     started = time.monotonic()
@@ -120,6 +125,12 @@ def stream_turn(
                 if first_token_ms is None:
                     first_token_ms = round((time.monotonic() - started) * 1000)
                 yield {"type": "text", "text": event["text"]}
+            elif kind == "tool_use_start":
+                yield {
+                    "type": "tool_use_start",
+                    "toolUseId": event.get("toolUseId"),
+                    "name": event.get("name", "unknown"),
+                }
             elif kind == "tool_use":
                 block = event["block"]
                 yield {
