@@ -8,11 +8,11 @@ import boto3
 
 EVALUATION_LOG_PREFIX = (
     "/aws/bedrock-agentcore/evaluations/results/"
-    "AgentCoreSupportDemoEvaluation-"
+    "AsagaoSupportAgentEvaluation-"
 )
 HARNESS_LOG_PREFIX = (
     "/aws/bedrock-agentcore/runtimes/"
-    "harness_AgentCoreSupportDemo-"
+    "harness_AsagaoSupportAgent-"
 )
 
 

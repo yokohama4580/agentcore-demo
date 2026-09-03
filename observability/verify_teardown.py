@@ -80,6 +80,7 @@ def main() -> int:
         if not is_not_found(error):
             raise
 
+    backup_recovery_points: list[str] = []
     tagging = session.client("resourcegroupstaggingapi")
     paginator = tagging.get_paginator("get_resources")
     for page in paginator.paginate(
@@ -87,6 +88,13 @@ def main() -> int:
     ):
         for item in page["ResourceTagMappingList"]:
             arn = item["ResourceARN"]
+            if ":backup:" in arn and ":recovery-point:" in arn:
+                # AWS Backup のバックアップ計画がデモスタックを保護対象に
+                # 取り込むと、タグが伝播した復旧ポイントが作られる。
+                # デモのスクリプトが作るものではなく、バックアップの自動削除は
+                # 安全側に倒して行わない（別枠で表示だけする）。
+                backup_recovery_points.append(arn)
+                continue
             if tagged_resource_exists(arn, session=session):
                 leftovers.append(arn)
             else:
@@ -155,6 +163,10 @@ def main() -> int:
         if PROJECT in item["Name"]:
             leftovers.append(f"S3 Bucket {item['Name']}")
 
+    if backup_recovery_points:
+        print("デモが作成しないリソース（アカウントのバックアップ計画由来・削除しない）:")
+        for item in sorted(backup_recovery_points):
+            print(f"- {item}")
     leftovers = sorted(set(leftovers))
     if leftovers:
         print("残存リソース:")
