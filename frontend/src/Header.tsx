@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { AppConfig } from "./types";
 import { modelLabel } from "./labels";
 
@@ -7,8 +6,6 @@ interface Props {
   sessionId: string;
   modelId: string | null;
   onModelChange: (modelId: string) => void;
-  fault: boolean;
-  onFaultChange: (fault: boolean) => void;
   showOps: boolean;
   onToggleOps: () => void;
   onNewSession: () => void;
@@ -16,7 +13,6 @@ interface Props {
 }
 
 export function Header(props: Props) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const { models } = props.config;
   const choices = [models.primary, models.alternate];
 
@@ -57,34 +53,6 @@ export function Header(props: Props) {
         <button className="btn" onClick={props.onToggleOps}>
           {props.showOps ? "裏側を隠す" : "裏側を表示"}
         </button>
-
-        <div className="settings">
-          <button
-            className={`btn icon ${props.fault ? "warn" : ""}`}
-            onClick={() => setSettingsOpen((v) => !v)}
-            aria-label="検証設定"
-            title="検証設定"
-          >
-            ⚙
-          </button>
-          {settingsOpen && (
-            <div className="settings-pop">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={props.fault}
-                  onChange={(e) => props.onFaultChange(e.target.checked)}
-                />
-                誤ルーティング規則を注入（検証用）
-              </label>
-              <p className="settings-note">
-                呼び出し時の system prompt override で、
-                処理状況の質問を配送ツールへ誘導する誤った規則を注入します。
-                Harness の設定や version は変わりません。
-              </p>
-            </div>
-          )}
-        </div>
       </div>
     </header>
   );

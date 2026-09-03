@@ -12,7 +12,6 @@ export default function App() {
   const [configError, setConfigError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>("");
   const [modelId, setModelId] = useState<string | null>(null);
-  const [fault, setFault] = useState(false);
   const [showOps, setShowOps] = useState(true);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -47,7 +46,6 @@ export default function App() {
         id,
         prompt,
         modelId,
-        fault,
         text: "",
         tools: [],
         metrics: null,
@@ -61,7 +59,6 @@ export default function App() {
           prompt,
           sessionId,
           modelId,
-          faultInjection: fault,
         })) {
           if (event.type === "text") {
             patchTurn(id, (t) => ({ ...t, text: t.text + event.text }));
@@ -129,7 +126,7 @@ export default function App() {
         setBusy(false);
       }
     },
-    [sessionId, modelId, fault, busy, patchTurn],
+    [sessionId, modelId, busy, patchTurn],
   );
 
   if (configError) {
@@ -152,8 +149,6 @@ export default function App() {
         sessionId={sessionId}
         modelId={modelId}
         onModelChange={setModelId}
-        fault={fault}
-        onFaultChange={setFault}
         showOps={showOps}
         onToggleOps={() => setShowOps((v) => !v)}
         onNewSession={resetSession}

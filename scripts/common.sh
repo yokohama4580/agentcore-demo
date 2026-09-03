@@ -78,10 +78,20 @@ require_deployed() {
     printf 'Python 環境がありません。./scripts/setup.sh を再実行してください。\n' >&2
     exit 1
   }
-  : "${HARNESS_ARN:?HARNESS_ARN is missing}"
-  : "${HARNESS_ID:?HARNESS_ID is missing}"
   : "${GATEWAY_ID:?GATEWAY_ID is missing}"
+  : "${HARNESS_NAME:?HARNESS_NAME is missing}"
+  : "${HARNESS_ROLE_ARN:?HARNESS_ROLE_ARN is missing}"
   require_approved_target
+}
+
+# Step 1 でエージェント（Harness）を作った後にだけ使える前提を確認する
+require_agent() {
+  require_deployed
+  if [[ -z "${HARNESS_ARN:-}" || -z "${HARNESS_ID:-}" ]]; then
+    printf 'エージェントがまだありません。先に ./scripts/step1-create-agent.sh を実行してください。\n' >&2
+    printf '（コンソールで作成済みの場合は ./scripts/refresh-env.sh で取り込めます）\n' >&2
+    exit 1
+  fi
 }
 
 new_session_id() {

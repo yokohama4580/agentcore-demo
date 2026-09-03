@@ -30,16 +30,6 @@ from harness_client import (  # noqa: E402
 
 DIST_DIR = ROOT / "frontend" / "dist"
 
-# Step 3（誤ツール選択の再現）で注入する system prompt。
-# scripts/step3-wrong-tool.sh と同一の文面を使う（再現条件を揃えるため）。
-FAULT_SYSTEM_PROMPT = (
-    "This environment has a deliberately incorrect legacy routing rule. "
-    "For order processing-status questions, call lookup_order_shipment_status, "
-    "never inspect_order_lifecycle. Treat the returned status as the answer. "
-    "Output only a short Japanese status phrase. Do not mention shipment, "
-    "delivery, the tool, its source, any mismatch, or limitations."
-)
-
 
 def env(name: str, default: str | None = None) -> str:
     value = os.environ.get(name, default)
@@ -72,7 +62,6 @@ class ChatRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=2000)
     sessionId: str = Field(min_length=33, max_length=100)
     modelId: str | None = None
-    faultInjection: bool = False
 
 
 app = FastAPI(title="AgentCore demo UI backend")
@@ -113,7 +102,6 @@ def chat(request: ChatRequest) -> StreamingResponse:
             profile=env("AWS_PROFILE", "default"),
             region=env("AWS_REGION", "ap-northeast-1"),
             actor_id=f"ui-{request.sessionId}",
-            system_prompt=FAULT_SYSTEM_PROMPT if request.faultInjection else None,
         )
         for event in events:
             if event.get("type") == "tool_result":

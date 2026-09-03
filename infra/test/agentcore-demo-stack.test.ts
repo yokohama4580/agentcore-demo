@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { App } from "aws-cdk-lib";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Template } from "aws-cdk-lib/assertions";
 import { AgentCoreDemoStack } from "../lib/agentcore-demo-stack";
 
 function template(): Template {
@@ -24,51 +24,35 @@ test("creates three IAM-protected API methods", () => {
   });
 });
 
-test("creates a managed harness with explicit limits and memory", () => {
+test("does not create the harness or evaluation config in CDK", () => {
+  // Step 1 of the demo story creates the Harness in the console (or CLI),
+  // and Step 5 creates the online evaluation config. The stack only
+  // provides the surrounding infrastructure and execution roles.
   const synthesized = template();
-  synthesized.hasResourceProperties("AWS::BedrockAgentCore::Harness", {
-    HarnessName: "AgentCoreSupportDemo",
-    MaxIterations: 8,
-    MaxTokens: 2048,
-    TimeoutSeconds: 120,
-    Memory: {
-      ManagedMemoryConfiguration: {
-        Strategies: ["SEMANTIC", "SUMMARIZATION"],
-        EventExpiryDuration: 3,
-      },
-    },
-    Model: {
-      BedrockModelConfig: Match.objectLike({
-        ModelId: "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
-        MaxTokens: 1024,
-      }),
-    },
-  });
-  const harness = Object.values(
-    synthesized.findResources("AWS::BedrockAgentCore::Harness"),
-  )[0] as { Properties: { Model: { BedrockModelConfig: { TopP?: number } } } };
-  assert.equal(harness.Properties.Model.BedrockModelConfig.TopP, undefined);
+  synthesized.resourceCountIs("AWS::BedrockAgentCore::Harness", 0);
+  synthesized.resourceCountIs(
+    "AWS::BedrockAgentCore::OnlineEvaluationConfig",
+    0,
+  );
 });
 
-test("creates gateway and online tool evaluations", () => {
+test("creates the gateway with a single target", () => {
   const synthesized = template();
   synthesized.resourceCountIs("AWS::BedrockAgentCore::Gateway", 1);
   synthesized.resourceCountIs("AWS::BedrockAgentCore::GatewayTarget", 1);
-  synthesized.hasResourceProperties(
-    "AWS::BedrockAgentCore::OnlineEvaluationConfig",
-    {
-      Evaluators: [
-        { EvaluatorId: "Builtin.ToolSelectionAccuracy" },
-        { EvaluatorId: "Builtin.ToolParameterAccuracy" },
-      ],
-      ExecutionStatus: "ENABLED",
-      Rule: Match.objectLike({
-        SamplingConfig: {
-          SamplingPercentage: 100,
-        },
-      }),
-    },
-  );
+});
+
+test("exports the names and role ARNs used by Step 1 and Step 5", () => {
+  const outputs = template().toJSON().Outputs as Record<string, unknown>;
+  for (const key of [
+    "HarnessName",
+    "HarnessRoleArn",
+    "EvaluationName",
+    "EvaluationRoleArn",
+    "GatewayArn",
+  ]) {
+    assert.ok(key in outputs, `missing output: ${key}`);
+  }
 });
 
 test("limits Gateway API invocation to the three GET fixture paths", () => {
@@ -79,7 +63,7 @@ test("limits Gateway API invocation to the three GET fixture paths", () => {
   assert.match(rendered, /\/demo\/GET\/shipments\/\*/);
 });
 
-test("grants the harness access to its managed memory", () => {
+test("grants the harness role access to its managed memory", () => {
   const resources = template().toJSON().Resources as Record<
     string,
     {
@@ -114,7 +98,7 @@ test("grants the harness access to its managed memory", () => {
   ]);
   assert.match(
     JSON.stringify(memoryStatement.Resource),
-    /memory\/AgentCoreSupportDemo-\*/,
+    /memory\/AsagaoSupportAgent-\*/,
   );
 });
 
@@ -128,16 +112,11 @@ test("allows evaluations to correlate split telemetry spans", () => {
 test("all taggable resources receive the project tag", () => {
   const resources = template().toJSON().Resources as Record<
     string,
-    { Type: string; Properties?: Record<string, unknown> }
+    { Type: string; Properties?: { Tags?: unknown } }
   >;
-  const harness = Object.values(resources).find(
-    (resource) => resource.Type === "AWS::BedrockAgentCore::Harness",
+  const gateway = Object.values(resources).find(
+    (resource) => resource.Type === "AWS::BedrockAgentCore::Gateway",
   );
-  assert.ok(harness);
-  assert.deepEqual(harness.Properties?.Tags, [
-    {
-      Key: "Project",
-      Value: "agentcore-support-demo",
-    },
-  ]);
+  assert.ok(gateway);
+  assert.match(JSON.stringify(gateway.Properties?.Tags), /agentcore-support-demo/);
 });

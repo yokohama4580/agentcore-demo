@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Step 4: Step 3 の 2 セッションのスパン階層を並べて「なぜ答えが違ったか」を示す。"""
 from __future__ import annotations
 
 import json
@@ -14,16 +15,27 @@ import boto3
 ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = ROOT / ".demo-state"
 SPANS_LOG_GROUP = "aws/spans"
+PREFERRED_LABELS = ("model-gap-primary", "model-gap-alternate")
 
 
-def latest_session_id() -> str:
-    preferred = STATE_DIR / "latest-wrong-tool-live.json"
-    if preferred.exists():
-        return json.loads(preferred.read_text(encoding="utf-8"))["sessionId"]
-    files = sorted(STATE_DIR.glob("latest-*.json"), key=lambda item: item.stat().st_mtime)
+def sessions_to_show() -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for label in PREFERRED_LABELS:
+        path = STATE_DIR / f"latest-{label}.json"
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            found.append((label, data["sessionId"]))
+    if found:
+        return found
+    files = sorted(
+        STATE_DIR.glob("latest-*.json"), key=lambda item: item.stat().st_mtime
+    )
     if not files:
-        raise RuntimeError("No invocation result exists in .demo-state")
-    return json.loads(files[-1].read_text(encoding="utf-8"))["sessionId"]
+        raise RuntimeError(
+            "対象セッションがありません。先に ./scripts/step3-compare-models.sh を実行してください。"
+        )
+    data = json.loads(files[-1].read_text(encoding="utf-8"))
+    return [(files[-1].stem.removeprefix("latest-"), data["sessionId"])]
 
 
 def run_query(
@@ -55,7 +67,7 @@ def run_query(
 
 def print_span_tree(rows: list[dict[str, str]]) -> None:
     if not rows:
-        print("Trace spans: not found")
+        print("Trace spans: not found（反映まで数十秒かかることがあります）")
         return
 
     trace_id = rows[0].get("traceId", "unknown")
@@ -86,150 +98,30 @@ def print_span_tree(rows: list[dict[str, str]]) -> None:
         render(root, 0)
 
 
-def flatten(value: Any, prefix: str = "") -> dict[str, Any]:
-    flattened: dict[str, Any] = {}
-    if isinstance(value, dict):
-        for key, item in value.items():
-            path = f"{prefix}.{key}" if prefix else key
-            flattened.update(flatten(item, path))
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            flattened.update(flatten(item, f"{prefix}[{index}]"))
-    else:
-        flattened[prefix] = value
-    return flattened
-
-
-def evaluation_summary(message: str) -> tuple[str, str, str]:
-    payload = json.loads(message)
-    values = flatten(payload)
-    evaluator = "unknown"
-    score = "unknown"
-    session_id = "unknown"
-    for key, value in values.items():
-        normalized = key.lower().replace("_", ".")
-        if (
-            evaluator == "unknown"
-            and (
-                "evaluator" in normalized
-                or "evaluation.name" in normalized
-            )
-            and (normalized.endswith(".id") or normalized.endswith(".name"))
-        ):
-            evaluator = str(value)
-        if score == "unknown" and "score" in normalized and isinstance(
-            value, (int, float)
-        ):
-            score = str(value)
-        if session_id == "unknown" and (
-            normalized.endswith("session.id")
-            or normalized.endswith("sessionid")
-        ):
-            session_id = str(value)
-    return evaluator, score, session_id
-
-
-def evaluation_rows(
-    logs: Any,
-    *,
-    log_group: str,
-    session_id: str,
-) -> list[dict[str, str]]:
-    query = (
-        "fields @timestamp, @message "
-        f"| filter @message like /{session_id}/ "
-        "| sort @timestamp asc | limit 20"
-    )
-    for attempt in range(3):
-        status, rows = run_query(logs, log_group=log_group, query=query)
-        if status != "Complete":
-            raise RuntimeError(f"Evaluation Logs Insights query: {status}")
-        if rows:
-            return rows
-        if attempt < 2:
-            time.sleep(10)
-    return []
-
-
-def latest_failed_tool_selection(
-    logs: Any,
-    *,
-    log_group: str,
-) -> dict[str, str] | None:
-    query = (
-        "fields @timestamp, @message "
-        "| filter @message like /Builtin.ToolSelectionAccuracy/ "
-        "| sort @timestamp desc | limit 100"
-    )
-    status, rows = run_query(logs, log_group=log_group, query=query)
-    if status != "Complete":
-        raise RuntimeError(f"Evaluation fallback Logs Insights query: {status}")
-    for row in rows:
-        try:
-            evaluator, score, _ = evaluation_summary(row.get("@message", "{}"))
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if evaluator == "Builtin.ToolSelectionAccuracy" and score in {"0", "0.0"}:
-            return row
-    return None
-
-
 def main() -> None:
     profile = os.environ.get("AWS_PROFILE", "default")
     region = os.environ.get("AWS_REGION", "ap-northeast-1")
     harness_log_group = os.environ["HARNESS_LOG_GROUP"]
-    evaluation_id = os.environ["ONLINE_EVALUATION_ID"]
-    evaluation_log_group = (
-        f"/aws/bedrock-agentcore/evaluations/results/{evaluation_id}"
-    )
-    session_id = latest_session_id()
     sdk_session = boto3.Session(profile_name=profile, region_name=region)
     logs = sdk_session.client("logs")
 
-    span_query = (
-        "fields @timestamp, name, traceId, spanId, parentSpanId, "
-        "`attributes.gen_ai.operation.name` as operation, "
-        "`attributes.gen_ai.tool.name` as toolName "
-        f"| filter @message like /{session_id}/ "
-        "| filter ispresent(operation) "
-        "| sort @timestamp asc | limit 100"
-    )
-    span_status, spans = run_query(
-        logs,
-        log_group=SPANS_LOG_GROUP,
-        query=span_query,
-    )
-    print(f"session: {session_id}")
-    print(f"Transaction Search query: {span_status}, spans={len(spans)}")
-    print_span_tree(spans)
-
-    rows = evaluation_rows(
-        logs,
-        log_group=evaluation_log_group,
-        session_id=session_id,
-    )
-    print("\nEvaluation results:")
-    if not rows:
-        backup = latest_failed_tool_selection(
-            logs,
-            log_group=evaluation_log_group,
+    for label, session_id in sessions_to_show():
+        print(f"\n=== {label} (session {session_id}) ===")
+        span_query = (
+            "fields @timestamp, name, traceId, spanId, parentSpanId, "
+            "`attributes.gen_ai.operation.name` as operation, "
+            "`attributes.gen_ai.tool.name` as toolName "
+            f"| filter @message like /{session_id}/ "
+            "| filter ispresent(operation) "
+            "| sort @timestamp asc | limit 100"
         )
-        if backup:
-            rows = [backup]
-            print("- live session pending; showing pre-evaluated failure")
-        else:
-            print("- live session pending; no pre-evaluated failure available")
-    for row in rows:
-        try:
-            evaluator, score, evaluated_session = evaluation_summary(
-                row.get("@message", "{}")
-            )
-            print(
-                f"- evaluator={evaluator} score={score} "
-                f"session={evaluated_session}"
-            )
-        except (json.JSONDecodeError, TypeError):
-            print(f"- {row.get('@message', '')[:240]}")
+        span_status, spans = run_query(
+            logs,
+            log_group=SPANS_LOG_GROUP,
+            query=span_query,
+        )
+        print(f"Transaction Search query: {span_status}, spans={len(spans)}")
+        print_span_tree(spans)
 
     encoded_group = urllib.parse.quote(harness_log_group, safe="")
     logs_url = (
@@ -240,13 +132,8 @@ def main() -> None:
         f"https://{region}.console.aws.amazon.com/cloudwatch/home"
         f"?region={region}#gen-ai-observability"
     )
-    evaluation_url = (
-        f"https://{region}.console.aws.amazon.com/bedrock-agentcore/home"
-        f"?region={region}#/evaluations"
-    )
     print(f"\nCloudWatch GenAI Observability:\n{genai_url}")
     print(f"\nHarness log group:\n{logs_url}")
-    print(f"\nAgentCore Evaluations:\n{evaluation_url}")
 
 
 if __name__ == "__main__":

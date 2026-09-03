@@ -3,7 +3,6 @@ import {
   Arn,
   ArnFormat,
   CfnOutput,
-  CfnTag,
   Duration,
   RemovalPolicy,
   Stack,
@@ -23,6 +22,11 @@ const PROJECT = "agentcore-support-demo";
 const STAGE = "demo";
 const PRIMARY_MODEL = "jp.anthropic.claude-haiku-4-5-20251001-v1:0";
 const ALTERNATE_MODEL = "jp.amazon.nova-2-lite-v1:0";
+// The Harness itself is created outside CDK (console or CLI) in Step 1 of the
+// demo story. The stack provides everything the Harness needs: the tools API,
+// the Gateway, and pre-created execution roles for the Harness / Evaluations.
+const HARNESS_NAME = "AsagaoSupportAgent";
+const EVALUATION_NAME = "AsagaoSupportAgentEvaluation";
 
 export class AgentCoreDemoStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps) {
@@ -239,7 +243,7 @@ export class AgentCoreDemoStack extends Stack {
                     method: "GET",
                     name: "inspect_order_lifecycle",
                     description:
-                      "Look up the order-management lifecycle state. Use for processing, payment, cancellation, or fulfillment questions.",
+                      "Look up the order-management lifecycle state. Returns the order's processing, payment, and cancellation status only.",
                   },
                   {
                     path: "/inventory/{sku}",
@@ -351,7 +355,7 @@ export class AgentCoreDemoStack extends Stack {
             {
               service: "bedrock-agentcore",
               resource: "memory",
-              resourceName: "AgentCoreSupportDemo-*",
+              resourceName: `${HARNESS_NAME}-*`,
               arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
             },
             this,
@@ -407,82 +411,6 @@ export class AgentCoreDemoStack extends Stack {
       }),
     );
 
-    const projectTag: CfnTag = {
-      key: "Project",
-      value: PROJECT,
-    };
-    const harness = new agentcore.CfnHarness(this, "Harness", {
-      harnessName: "AgentCoreSupportDemo",
-      executionRoleArn: harnessRole.roleArn,
-      model: {
-        bedrockModelConfig: {
-          modelId: PRIMARY_MODEL,
-          apiFormat: "converse_stream",
-          maxTokens: 1024,
-          temperature: 0.2,
-        },
-      },
-      systemPrompt: [
-        {
-          text: "You are a customer support agent for a fictional ecommerce order service. Answer in Japanese. Use tools for operational facts, cite the returned source, and never invent missing values.",
-        },
-      ],
-      tools: [
-        {
-          type: "agentcore_gateway",
-          name: "order_operations",
-          config: {
-            agentCoreGateway: {
-              gatewayArn: gateway.gatewayArn,
-              outboundAuth: {
-                awsIam: {},
-              },
-            },
-          },
-        },
-      ],
-      memory: {
-        managedMemoryConfiguration: {
-          strategies: ["SEMANTIC", "SUMMARIZATION"],
-          eventExpiryDuration: 3,
-        },
-      },
-      environment: {
-        agentCoreRuntimeEnvironment: {
-          networkConfiguration: {
-            networkMode: "PUBLIC",
-          },
-          lifecycleConfiguration: {
-            idleRuntimeSessionTimeout: 900,
-            maxLifetime: 3600,
-          },
-        },
-      },
-      truncation: {
-        strategy: "sliding_window",
-        config: {
-          slidingWindow: {
-            messagesCount: 20,
-          },
-        },
-      },
-      maxIterations: 8,
-      maxTokens: 2048,
-      timeoutSeconds: 120,
-      tags: [projectTag],
-    });
-    harness.node.addDependency(gatewayTarget);
-
-    const harnessLogGroupName = `/aws/bedrock-agentcore/runtimes/${harness.attrEnvironmentAgentCoreRuntimeEnvironmentAgentRuntimeId}-DEFAULT`;
-    const harnessLogGroupArn = Arn.format(
-      {
-        service: "logs",
-        resource: "log-group",
-        resourceName: harnessLogGroupName,
-        arnFormat: ArnFormat.COLON_RESOURCE_NAME,
-      },
-      this,
-    );
     const sharedSpansLogGroupArn = Arn.format(
       {
         service: "logs",
@@ -523,7 +451,7 @@ export class AgentCoreDemoStack extends Stack {
     evaluationRole.addToPolicy(
       new iam.PolicyStatement({
         actions: ["logs:StartQuery"],
-        resources: [harnessLogGroupArn, sharedSpansLogGroupArn],
+        resources: [harnessRuntimeLogGroupsArn, sharedSpansLogGroupArn],
       }),
     );
     evaluationRole.addToPolicy(
@@ -536,8 +464,7 @@ export class AgentCoreDemoStack extends Stack {
       {
         service: "logs",
         resource: "log-group",
-        resourceName:
-          "/aws/bedrock-agentcore/evaluations/results/AgentCoreSupportDemoEvaluation-*",
+        resourceName: `/aws/bedrock-agentcore/evaluations/results/${EVALUATION_NAME}-*`,
         arnFormat: ArnFormat.COLON_RESOURCE_NAME,
       },
       this,
@@ -554,38 +481,6 @@ export class AgentCoreDemoStack extends Stack {
         resources: [`${evaluationResultsLogGroupsArn}:log-stream:*`],
       }),
     );
-
-    const evaluation = new agentcore.OnlineEvaluationConfig(
-      this,
-      "OnlineEvaluation",
-      {
-        onlineEvaluationConfigName: "AgentCoreSupportDemoEvaluation",
-        description:
-          "Evaluates tool selection and parameters for the support agent demo",
-        evaluators: [
-          agentcore.EvaluatorSelector.builtin(
-            agentcore.BuiltinEvaluator.TOOL_SELECTION_ACCURACY,
-          ),
-          agentcore.EvaluatorSelector.builtin(
-            agentcore.BuiltinEvaluator.TOOL_PARAMETER_ACCURACY,
-          ),
-        ],
-        dataSource: agentcore.DataSourceConfig.fromCloudWatchLogs({
-          logGroupNames: [harnessLogGroupName],
-          serviceNames: [
-            `${harness.attrEnvironmentAgentCoreRuntimeEnvironmentAgentRuntimeName}.DEFAULT`,
-          ],
-        }),
-        executionRole: evaluationRole,
-        samplingPercentage: 100,
-        sessionTimeout: Duration.minutes(1),
-        executionStatus: agentcore.ExecutionStatus.ENABLED,
-        tags: {
-          Project: PROJECT,
-        },
-      },
-    );
-    evaluation.node.addDependency(harness);
 
     NagSuppressions.addResourceSuppressions(
       functionRole,
@@ -689,26 +584,17 @@ export class AgentCoreDemoStack extends Stack {
 
     new CfnOutput(this, "ApiId", { value: api.restApiId });
     new CfnOutput(this, "ApiUrl", { value: api.url });
-    new CfnOutput(this, "HarnessArn", { value: harness.attrArn });
-    new CfnOutput(this, "HarnessId", { value: harness.attrHarnessId });
-    new CfnOutput(this, "HarnessVersion", { value: harness.attrVersion });
-    new CfnOutput(this, "HarnessRuntimeId", {
-      value: harness.attrEnvironmentAgentCoreRuntimeEnvironmentAgentRuntimeId,
-    });
-    new CfnOutput(this, "HarnessRuntimeName", {
-      value: harness.attrEnvironmentAgentCoreRuntimeEnvironmentAgentRuntimeName,
-    });
-    new CfnOutput(this, "HarnessLogGroup", {
-      value: harnessLogGroupName,
+    new CfnOutput(this, "HarnessName", { value: HARNESS_NAME });
+    new CfnOutput(this, "HarnessRoleArn", { value: harnessRole.roleArn });
+    new CfnOutput(this, "EvaluationName", { value: EVALUATION_NAME });
+    new CfnOutput(this, "EvaluationRoleArn", {
+      value: evaluationRole.roleArn,
     });
     new CfnOutput(this, "GatewayArn", { value: gateway.gatewayArn });
     new CfnOutput(this, "GatewayId", { value: gateway.gatewayId });
     new CfnOutput(this, "GatewayUrl", { value: gateway.gatewayUrl! });
     new CfnOutput(this, "GatewayTargetId", {
       value: gatewayTarget.attrTargetId,
-    });
-    new CfnOutput(this, "OnlineEvaluationId", {
-      value: evaluation.onlineEvaluationConfigId,
     });
     new CfnOutput(this, "DashboardName", {
       value: dashboard.dashboardName,

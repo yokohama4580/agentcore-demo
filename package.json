@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "format:check": "prettier --check \"infra/**/*.ts\" \"*.json\"",
-    "test": "tsx --test infra/test/*.test.ts && python3 -m unittest discover -s tests -p 'test_*.py'",
+    "test": "tsx --test infra/test/*.test.ts && .venv/bin/python -m unittest discover -s tests -p 'test_*.py'",
     "cdk": "cdk",
     "synth": "cdk synth --strict",
     "diff": "cdk diff",

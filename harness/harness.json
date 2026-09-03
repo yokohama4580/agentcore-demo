@@ -1,16 +1,16 @@
 {
-  "harnessName": "AgentCoreSupportDemo",
+  "harnessName": "AsagaoSupportAgent",
   "model": {
     "bedrockModelConfig": {
-      "modelId": "jp.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "modelId": "${PRIMARY_MODEL_ID}",
       "apiFormat": "converse_stream",
       "maxTokens": 1024,
-      "temperature": 0.2
+      "temperature": 0.0
     }
   },
   "systemPrompt": [
     {
-      "text": "You are a customer support agent for a fictional ecommerce order service. Answer in Japanese. Use tools for operational facts, cite the returned source, and never invent missing values."
+      "text": "You are the AI assistant embedded in Asagao, a fictional order-management SaaS for ecommerce businesses. Answer in Japanese, concisely. Use tools for operational facts, cite the returned source, and never invent missing values."
     }
   ],
   "tools": [
@@ -33,9 +33,26 @@
       "eventExpiryDuration": 3
     }
   },
-  "limits": {
-    "maxIterations": 8,
-    "maxTokens": 2048,
-    "timeoutSeconds": 120
-  }
+  "environment": {
+    "agentCoreRuntimeEnvironment": {
+      "networkConfiguration": {
+        "networkMode": "PUBLIC"
+      },
+      "lifecycleConfiguration": {
+        "idleRuntimeSessionTimeout": 900,
+        "maxLifetime": 3600
+      }
+    }
+  },
+  "truncation": {
+    "strategy": "sliding_window",
+    "config": {
+      "slidingWindow": {
+        "messagesCount": 20
+      }
+    }
+  },
+  "maxIterations": 8,
+  "maxTokens": 2048,
+  "timeoutSeconds": 120
 }

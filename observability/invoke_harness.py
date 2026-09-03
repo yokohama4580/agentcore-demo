@@ -289,7 +289,7 @@ def invoke(
             "bedrockModelConfig": {
                 "modelId": model_id,
                 "maxTokens": 1024,
-                "temperature": 0.2,
+                "temperature": 0.0,
             }
         }
     if system_prompt:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "observability"))
 from invoke_harness import parse_stream  # noqa: E402
-from measure_wrong_tool import matches_tool_name, wilson_interval  # noqa: E402
+from measure_model_gap import has_tool, wilson_interval  # noqa: E402
 
 
 class StreamParserTest(unittest.TestCase):
@@ -135,15 +135,15 @@ class StreamParserTest(unittest.TestCase):
 
     def test_matches_gateway_qualified_tool_name(self) -> None:
         self.assertTrue(
-            matches_tool_name(
-                "order-operations-api___lookup_order_shipment_status",
-                "lookup_order_shipment_status",
+            has_tool(
+                ["order-operations-api___lookup_inventory"],
+                "lookup_inventory",
             )
         )
         self.assertFalse(
-            matches_tool_name(
-                "order-operations-api___inspect_order_lifecycle",
-                "lookup_order_shipment_status",
+            has_tool(
+                ["order-operations-api___inspect_order_lifecycle"],
+                "lookup_inventory",
             )
         )
 

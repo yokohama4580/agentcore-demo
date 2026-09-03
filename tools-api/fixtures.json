@@ -4,12 +4,26 @@
       "orderId": "A-100",
       "status": "PROCESSING",
       "paymentStatus": "PAID",
+      "items": [
+        {
+          "sku": "SKU-RED-01",
+          "productName": "あさがお柄マグカップ（赤）",
+          "quantity": 1
+        }
+      ],
       "updatedAt": "2026-08-28T10:15:00+09:00"
     },
     "A-200": {
       "orderId": "A-200",
       "status": "CANCELLED",
       "paymentStatus": "REFUNDED",
+      "items": [
+        {
+          "sku": "SKU-BLUE-02",
+          "productName": "あさがお柄マグカップ（青）",
+          "quantity": 2
+        }
+      ],
       "updatedAt": "2026-08-27T16:40:00+09:00"
     }
   },

@@ -80,21 +80,20 @@ class ChatStreamTest(unittest.TestCase):
         )
         self.assertEqual(events, fake_events)
         self.assertEqual(captured["session_id"], SESSION_ID)
-        self.assertIsNone(captured["system_prompt"])
+        self.assertIsNone(captured.get("system_prompt"))
         self.assertIsNone(captured["model_id"])
 
-    def test_fault_injection_sets_system_prompt(self) -> None:
+    def test_model_override_passes_through(self) -> None:
         _, captured = self.run_chat(
             {
                 "prompt": "status?",
                 "sessionId": SESSION_ID,
                 "modelId": DEMO_ENV["ALTERNATE_MODEL_ID"],
-                "faultInjection": True,
             },
             [{"type": "done", "firstTokenMs": None, "elapsedMs": 1, "usage": {}}],
         )
-        self.assertEqual(captured["system_prompt"], server_app.FAULT_SYSTEM_PROMPT)
         self.assertEqual(captured["model_id"], DEMO_ENV["ALTERNATE_MODEL_ID"])
+        self.assertIsNone(captured.get("system_prompt"))
 
     def test_rejects_short_session_id(self) -> None:
         with mock.patch.dict(os.environ, DEMO_ENV):

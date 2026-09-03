@@ -17,7 +17,6 @@ export interface ChatParams {
   prompt: string;
   sessionId: string;
   modelId: string | null;
-  faultInjection: boolean;
 }
 
 export async function* streamChat(

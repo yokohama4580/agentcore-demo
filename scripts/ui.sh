@@ -5,9 +5,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/scripts/common.sh"
 require_tools
-require_deployed
+require_agent
 
-section "DEMO UI"
+section "STEP 2 - CONNECT YOUR PRODUCT (DEMO UI)"
 
 if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
   printf 'フロントエンドの依存をインストールします…\n'

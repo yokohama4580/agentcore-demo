@@ -54,9 +54,6 @@ function TurnBlock({ turn, index }: { turn: Turn; index: number }) {
         <span className="ops-model">
           {turn.modelId ? modelLabel(turn.modelId) : "harness 既定"}
         </span>
-        {turn.fault && (
-          <span className="ops-fault">⚠ 検証: 誤ルーティング規則を注入</span>
-        )}
       </div>
       {turn.tools.map((tool) => (
         <ToolCard key={tool.toolUseId} tool={tool} />

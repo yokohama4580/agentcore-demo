@@ -37,7 +37,6 @@ export interface Turn {
   id: string;
   prompt: string;
   modelId: string | null;
-  fault: boolean;
   text: string;
   tools: ToolCall[];
   metrics: TurnMetrics | null;

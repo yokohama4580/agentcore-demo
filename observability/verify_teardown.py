@@ -94,7 +94,7 @@ def main() -> int:
 
     control = session.client("bedrock-agentcore-control")
     for item in control.list_harnesses().get("harnesses", []):
-        if item.get("harnessName") == "AgentCoreSupportDemo":
+        if item.get("harnessName") == "AsagaoSupportAgent":
             leftovers.append(f"Harness {item.get('harnessArn', item)}")
     for item in control.list_gateways().get("items", []):
         if item.get("name") == "agentcore-support-demo-gateway":
@@ -104,15 +104,15 @@ def main() -> int:
     ):
         if (
             item.get("onlineEvaluationConfigName")
-            == "AgentCoreSupportDemoEvaluation"
+            == "AsagaoSupportAgentEvaluation"
         ):
             leftovers.append(f"OnlineEvaluation {item}")
 
     for item in control.list_agent_runtimes().get("agentRuntimes", []):
-        if item.get("agentRuntimeName") == "harness_AgentCoreSupportDemo":
+        if item.get("agentRuntimeName") == "harness_AsagaoSupportAgent":
             leftovers.append(f"Runtime {item}")
     for item in control.list_workload_identities().get("workloadIdentities", []):
-        if item.get("name", "").startswith("harness_AgentCoreSupportDemo-"):
+        if item.get("name", "").startswith("harness_AsagaoSupportAgent-"):
             leftovers.append(f"WorkloadIdentity {item}")
 
     lambda_client = session.client("lambda")
@@ -132,7 +132,11 @@ def main() -> int:
             "logGroups", []
         ):
             name = item["logGroupName"]
-            if stack_name in name or "AgentCoreSupportDemo" in name:
+            if (
+                stack_name in name
+                or "AgentCoreSupportDemo" in name
+                or "AsagaoSupportAgent" in name
+            ):
                 leftovers.append(f"LogGroup {name}")
 
     iam = session.client("iam")

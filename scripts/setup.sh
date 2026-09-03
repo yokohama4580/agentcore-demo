@@ -34,5 +34,5 @@ set -a
 source "${ROOT}/.demo.env"
 set +a
 "${PYTHON}" "${ROOT}/observability/wait_ready.py"
-"${PYTHON}" "${ROOT}/observability/configure_logs.py"
-printf '\nセットアップ完了。Harness と GatewayTarget は READY です。\n'
+printf '\nセットアップ完了。GatewayTarget は READY です。\n'
+printf '次はエージェント本体を作ります: ./scripts/step1-create-agent.sh\n'
