@@ -203,8 +203,8 @@ AgentCore コンソールの **Evaluation → Create evaluation configuration** 
 - **名前は `AsagaoSupportAgentEvaluation` で始めること**。実行ロールは結果用ロググループ
   `/aws/bedrock-agentcore/evaluations/results/AsagaoSupportAgentEvaluation*` にだけ
   書き込めるので、別の名前だと作成が `ValidationException` で落ちる
-- 採点は継続スケジュールで走るため反映まで数分かかる（この環境の実測では 8 分超）。
-  人前では**事前に採点済みのものを開く**
+- 採点は継続スケジュールで走るため反映まで時間がかかる（この環境の実測では速いときで
+  10 分弱、遅いときは 1 時間近く）。人前では**事前に採点済みのものを開く**
 
 CLI 版（事前練習用。作成 + 採点結果の表示）:
 
@@ -300,4 +300,6 @@ Harness と Online Evaluation はデモの筋書き上、CDK ではなく画面�
   to create log group」で失敗する
 - 同じ名前のエージェントを削除直後に作り直すと、managed Memory の削除が終わるまで
   `CREATE_FAILED`（`Memory with name ... already exists`）になる。数分待ってから作り直す
+- `harness/harness.json` を変えたら**ブラウザのタブを再読み込みする**。デモ UI の作成フォームは
+  ページ読み込み時の設定を保持するため、古いタブから作ると古い設定のエージェントができる
 - 従来の Bedrock Agents（classic）とは別物であり、このデモでは使わない
