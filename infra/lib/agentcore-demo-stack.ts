@@ -355,7 +355,9 @@ export class AgentCoreDemoStack extends Stack {
             {
               service: "bedrock-agentcore",
               resource: "memory",
-              resourceName: `${HARNESS_NAME}-*`,
+              // デモ中に作るエージェントは名前に接尾辞が付く（AsagaoSupportAgentLive など）。
+              // managed Memory の名前もそれに続くので、ハイフンを含めない前方一致にする
+              resourceName: `${HARNESS_NAME}*`,
               arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
             },
             this,
@@ -464,7 +466,9 @@ export class AgentCoreDemoStack extends Stack {
       {
         service: "logs",
         resource: "log-group",
-        resourceName: `/aws/bedrock-agentcore/evaluations/results/${EVALUATION_NAME}-*`,
+        // Step 5 はコンソールから作ることもあり、名前に接尾辞が付く場合がある
+        // （AsagaoSupportAgentEvaluationLive など）。ハイフンを含めない前方一致にする
+        resourceName: `/aws/bedrock-agentcore/evaluations/results/${EVALUATION_NAME}*`,
         arnFormat: ArnFormat.COLON_RESOURCE_NAME,
       },
       this,

@@ -184,38 +184,6 @@ body {
   background: var(--accent-soft);
 }
 
-.settings {
-  position: relative;
-}
-
-.settings-pop {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  width: 320px;
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(35, 39, 47, 0.14);
-  padding: 14px 16px;
-  z-index: 20;
-  font-size: 13px;
-}
-
-.settings-pop label {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.settings-note {
-  color: var(--ink-soft);
-  font-size: 12px;
-  margin: 8px 0 0;
-}
-
 /* ---------- panes ---------- */
 
 .panes {
@@ -672,5 +640,283 @@ body {
 @media (max-width: 1100px) {
   .ops-pane {
     width: 400px;
+  }
+}
+
+/* ---------- Step 1: エージェント設定の画面 ---------- */
+
+.setup-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+}
+
+.setup {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 24px 28px 40px;
+  align-items: start;
+}
+
+.setup .card:first-child {
+  grid-row: span 2;
+}
+
+.card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 22px 22px;
+  box-shadow: 0 6px 20px rgba(35, 39, 47, 0.05);
+}
+
+.card h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-brand);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+.card h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+
+.card-lead {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.card-note {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+.card-error {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field > span {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 0;
+  border-color: var(--ink);
+  background: var(--white);
+}
+
+.field-block {
+  margin-bottom: 14px;
+}
+
+.field-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.tool-list,
+.spec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+
+.tool-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.tool-list code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.tool-jp {
+  color: var(--ink);
+}
+
+.tool-api {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.spec-list li {
+  padding: 3px 0;
+  color: var(--ink-soft);
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.btn.primary {
+  background: var(--ink);
+  color: var(--white);
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: #000;
+}
+
+.btn.small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.agent-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+}
+
+.agent-chip.ready {
+  border-color: #2f8f68;
+  background: #e6f5ee;
+  color: #1f6b4d;
+}
+
+.agent-chip.creating {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.agent-status-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.agent-status-head code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.agent-test {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 4px;
+}
+
+.test-answer {
+  margin-top: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  white-space: pre-wrap;
+}
+
+.paste-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paste-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.paste-label {
+  flex: 0 0 92px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.paste-value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ops-session code {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ops-dim);
+}
+
+.ops-session .btn.small {
+  background: var(--ops-panel);
+  border-color: var(--ops-line);
+  color: var(--ops-text);
+}
+
+@media (max-width: 1100px) {
+  .setup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .setup .card:first-child {
+    grid-row: auto;
   }
 }

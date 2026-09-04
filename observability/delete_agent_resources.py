@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """teardown の前段: CDK 管理外で作った Harness と Online Evaluation を削除する。
 
-Step 1（コンソール / CLI）と Step 5 で作ったリソースが対象。
+Step 1（画面 / コンソール / CLI）と Step 5 で作ったリソースが対象。
+デモ中に作るエージェントは名前に接尾辞が付くことがある（AsagaoSupportAgentLive など）ため、
+どちらも名前の前方一致で拾って全部削除する。
 Harness が自動プロビジョニングした managed Memory の削除は
 wait_agentcore_deleted.py（Project タグ起点）が引き受ける。
 """
@@ -21,11 +23,12 @@ def is_not_found(error: ClientError) -> bool:
     )
 
 
-def delete_evaluations(control, name: str) -> None:
+def delete_evaluations(control, base_name: str) -> None:
     paginator = control.get_paginator("list_online_evaluation_configs")
     for page in paginator.paginate():
         for item in page.get("onlineEvaluationConfigs", []):
-            if item.get("onlineEvaluationConfigName") != name:
+            name = str(item.get("onlineEvaluationConfigName", ""))
+            if not name.startswith(base_name):
                 continue
             config_id = item["onlineEvaluationConfigId"]
             try:
@@ -38,17 +41,21 @@ def delete_evaluations(control, name: str) -> None:
                     raise
 
 
-def delete_harness(control, name: str) -> None:
-    harness_id = None
+def delete_harnesses(control, base_name: str) -> None:
+    harness_ids: list[str] = []
     paginator = control.get_paginator("list_harnesses")
     for page in paginator.paginate():
         for item in page.get("harnesses", []):
-            if item.get("harnessName") == name:
-                harness_id = item["harnessId"]
-    if harness_id is None:
-        print(f"Harness {name} は存在しません（削除済み）。")
+            if str(item.get("harnessName", "")).startswith(base_name):
+                harness_ids.append(item["harnessId"])
+    if not harness_ids:
+        print(f"Harness {base_name}* は存在しません（削除済み）。")
         return
+    for harness_id in harness_ids:
+        delete_harness(control, harness_id)
 
+
+def delete_harness(control, harness_id: str) -> None:
     try:
         control.delete_harness(harnessId=harness_id)
         print(f"Harness の削除を開始しました: {harness_id}")
@@ -75,7 +82,7 @@ def main() -> None:
     session = boto3.Session(profile_name=profile, region_name=region)
     control = session.client("bedrock-agentcore-control")
     delete_evaluations(control, os.environ["EVALUATION_NAME"])
-    delete_harness(control, os.environ["HARNESS_NAME"])
+    delete_harnesses(control, os.environ["HARNESS_NAME"])
 
 
 if __name__ == "__main__":

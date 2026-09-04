@@ -21,6 +21,11 @@ export function modelLabel(modelId: string): string {
   return tail.replace(/-v\d.*$/, "");
 }
 
+/** 画面に出す ARN から AWS アカウント ID を隠す（コピーされる値は実物のまま）。 */
+export function maskAccountId(text: string): string {
+  return text.replace(/\d{12}/g, "•".repeat(12));
+}
+
 export function formatJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2);

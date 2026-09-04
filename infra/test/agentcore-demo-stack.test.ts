@@ -96,9 +96,24 @@ test("grants the harness role access to its managed memory", () => {
     "bedrock-agentcore:ListEvents",
     "bedrock-agentcore:RetrieveMemoryRecords",
   ]);
+  // デモ中に作る AsagaoSupportAgentLive などの managed Memory も含む前方一致であること
   assert.match(
     JSON.stringify(memoryStatement.Resource),
-    /memory\/AsagaoSupportAgent-\*/,
+    /memory\/AsagaoSupportAgent\*/,
+  );
+});
+
+test("lets the evaluation role write results for suffixed config names", () => {
+  // Step 5 をコンソールから作ると名前に接尾辞が付くことがある。ハイフン止まりの
+  // 前方一致だと CreateOnlineEvaluationConfig が ValidationException で落ちる
+  const rendered = JSON.stringify(template().toJSON());
+  assert.match(
+    rendered,
+    /\/aws\/bedrock-agentcore\/evaluations\/results\/AsagaoSupportAgentEvaluation\*/,
+  );
+  assert.doesNotMatch(
+    rendered,
+    /\/aws\/bedrock-agentcore\/evaluations\/results\/AsagaoSupportAgentEvaluation-\*/,
   );
 });
 

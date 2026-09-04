@@ -102,7 +102,7 @@ def main() -> int:
 
     control = session.client("bedrock-agentcore-control")
     for item in control.list_harnesses().get("harnesses", []):
-        if item.get("harnessName") == "AsagaoSupportAgent":
+        if str(item.get("harnessName", "")).startswith("AsagaoSupportAgent"):
             leftovers.append(f"Harness {item.get('harnessArn', item)}")
     for item in control.list_gateways().get("items", []):
         if item.get("name") == "agentcore-support-demo-gateway":
@@ -110,17 +110,18 @@ def main() -> int:
     for item in control.list_online_evaluation_configs().get(
         "onlineEvaluationConfigs", []
     ):
-        if (
-            item.get("onlineEvaluationConfigName")
-            == "AsagaoSupportAgentEvaluation"
+        if str(item.get("onlineEvaluationConfigName", "")).startswith(
+            "AsagaoSupportAgentEvaluation"
         ):
             leftovers.append(f"OnlineEvaluation {item}")
 
     for item in control.list_agent_runtimes().get("agentRuntimes", []):
-        if item.get("agentRuntimeName") == "harness_AsagaoSupportAgent":
+        if str(item.get("agentRuntimeName", "")).startswith(
+            "harness_AsagaoSupportAgent"
+        ):
             leftovers.append(f"Runtime {item}")
     for item in control.list_workload_identities().get("workloadIdentities", []):
-        if item.get("name", "").startswith("harness_AsagaoSupportAgent-"):
+        if item.get("name", "").startswith("harness_AsagaoSupportAgent"):
             leftovers.append(f"WorkloadIdentity {item}")
 
     lambda_client = session.client("lambda")

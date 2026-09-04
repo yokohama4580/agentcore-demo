@@ -7,7 +7,8 @@ source "${ROOT}/scripts/common.sh"
 require_no_args "$@"
 require_deployed
 
-section "STEP 1 - CREATE THE AGENT (HARNESS)"
+section "STEP 1 - CREATE THE AGENT (HARNESS) [事前練習用]"
+printf '本番のデモはデモ UI の「エージェント設定」タブで作ります。これはその CLI 版です。\n'
 printf '設定ファイル harness/harness.json の内容でエージェントを用意します。\n'
 printf 'モード: %s（STEP1_MODE=cli で CreateHarness API から作成）\n' \
   "${STEP1_MODE:-console}"

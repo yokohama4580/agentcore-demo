@@ -6,13 +6,15 @@ import os
 import boto3
 
 
+# デモ中に作るエージェントは名前に接尾辞が付くことがあるため（AsagaoSupportAgentLive
+# など）、末尾のハイフンを含めない前方一致で拾う。
 EVALUATION_LOG_PREFIX = (
     "/aws/bedrock-agentcore/evaluations/results/"
-    "AsagaoSupportAgentEvaluation-"
+    "AsagaoSupportAgentEvaluation"
 )
 HARNESS_LOG_PREFIX = (
     "/aws/bedrock-agentcore/runtimes/"
-    "harness_AsagaoSupportAgent-"
+    "harness_AsagaoSupportAgent"
 )
 
 

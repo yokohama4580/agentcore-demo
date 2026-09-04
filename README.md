@@ -4,13 +4,17 @@
 **AI エージェントを「作る → 製品に繋ぐ → 精度の壁に当たる → 中身を見る → 仕組みにする」**
 という流れを Amazon Bedrock AgentCore で一通り体験するデモです。
 
-| ステップ | 内容 | 使うもの |
+| ステップ | 内容 | 操作する画面 |
 | --- | --- | --- |
-| 1. 作る | コンソール（または CLI）で Harness を作成し、その場でテストする | AgentCore コンソール / `step1-create-agent.sh` |
-| 2. 自社製品に繋ぐ | 手元のアプリ（2 ペインのデモ UI）から同じエージェントを呼ぶ | `ui.sh` |
-| 3. 精度の壁に当たる | モデルを切り替えると、同じ質問への答えが変わる | デモ UI / `step3-compare-models.sh` |
-| 4. 中身を見る | トレースで「なぜ答えが違ったのか」を特定する | `step4-traces.sh` / CloudWatch GenAI Observability |
-| 5. 仕組みにする | Online Evaluations を有効化し、本番トラフィックを継続採点する | `step5-evaluations.sh` / AgentCore Evaluations |
+| 1. 作る | エージェント（Harness）を設定だけで作り、その場でテストする | デモ UI の「エージェント設定」／AgentCore コンソール |
+| 2. 自社製品に繋ぐ | 同じエージェントを手元のアプリから呼ぶ | デモ UI の「AI アシスタント」 |
+| 3. 精度の壁に当たる | モデルを切り替えると、同じ質問への答えが変わる | デモ UI（ヘッダーのモデル切替） |
+| 4. 中身を見る | トレースで「なぜ答えが違ったのか」を特定する | CloudWatch GenAI Observability |
+| 5. 仕組みにする | Online Evaluations を有効化し、本番トラフィックを継続採点する | AgentCore コンソールの Evaluation |
+
+**Step 1〜5 の操作はブラウザ（デモ UI + AWS コンソール）だけで完結します。**
+ターミナルを使うのは事前のデプロイ・練習・後片付けだけです（`setup.sh` / 各 CLI 版
+スクリプト / `teardown.sh`）。人前で見せる場では黒い画面を出しません。
 
 デモ用のデータは固定 fixture のみで、DB も VPC も使いません。`./scripts/teardown.sh`
 一発で全リソースを削除し、残存 0 件を検証します。
@@ -39,13 +43,19 @@ git clone https://github.com/yokohama4580/agentcore-demo.git
 cd agentcore-demo
 cp .demo.env.example .demo.env
 # .demo.env の AWS_PROFILE / APPROVED_ACCOUNT_ID / APPROVED_REGION を自分の値に書き換える
-./scripts/setup.sh                # 土台（tools API / Gateway / IAM ロール）を CDK で構築
-./scripts/step1-create-agent.sh   # エージェント本体を作る（既定はコンソール作成の伴走）
-./scripts/ui.sh                   # デモ UI（Step 2〜3 はブラウザで操作）
-./scripts/step3-compare-models.sh # Step 3 の CLI 版
-./scripts/step4-traces.sh
-./scripts/step5-evaluations.sh
+./scripts/setup.sh   # 土台（tools API / Gateway / IAM ロール）を CDK で構築
+./scripts/ui.sh      # デモ UI を起動 → あとは http://127.0.0.1:8788 と AWS コンソールだけ
 ./scripts/teardown.sh
+```
+
+事前練習・実測用の CLI 版（本番のデモでは使いません）:
+
+```bash
+./scripts/step1-create-agent.sh   # エージェントを CLI で作る（STEP1_MODE=cli）
+./scripts/step3-compare-models.sh # モデル比較を CLI で 1 往復ずつ
+./scripts/measure-model-gap.sh    # Step 3 の再現率を N 回試行して測る
+./scripts/step4-traces.sh         # スパン階層をターミナルに出す
+./scripts/step5-evaluations.sh    # Online Evaluation を CLI で作り採点結果を出す
 ```
 
 各スクリプトは引数も対話入力も取りません（切り替えは環境変数で行います）。
@@ -59,11 +69,13 @@ CDK app とすべてのデモスクリプトは、`aws sts get-caller-identity` 
 ## アーキテクチャ
 
 ```text
-AgentCore コンソール（Step 1: 作成・sandbox テスト）
-デモ UI（Step 2〜3: ローカルの React + FastAPI）
-デモ用シェルスクリプト（CLI 版）
+デモ UI（ローカルの React + FastAPI）
+  ├── エージェント設定タブ … Step 1: CreateHarness / 状態表示 / その場でテスト
+  └── AI アシスタントタブ … Step 2〜3: 顧客に見える画面 + 運用ビュー
+AgentCore コンソール（Step 1 の別経路・Step 5: Evaluation の作成）
+デモ用シェルスクリプト（事前練習・実測用の CLI 版）
   |
-  +-- AgentCore Harness "AsagaoSupportAgent"（マネージド agent loop / Memory）
+  +-- AgentCore Harness "AsagaoSupportAgent*"（マネージド agent loop / Memory）
          +-- Bedrock model（呼び出し時 override で切替可能）
          +-- AgentCore Gateway（MCP）
                 +-- API Gateway REST API + Lambda（既存 API の想定。固定 fixture）
@@ -76,26 +88,42 @@ AgentCore Evaluations（Step 5: LLM-as-a-Judge の継続採点）
 
 - **CDK スタック（`AgentCoreSupportDemo`）**: 土台だけを管理する。tools API（Lambda +
   API Gateway）、Gateway と GatewayTarget、Harness / Evaluations の実行ロール、ダッシュボード
-- **Harness（Step 1）と Online Evaluation（Step 5）**: デモの中で作る。コンソールでも
-  CLI でも作れて、どちらの経路でも同じ設定になる（`harness/harness.json` が単一の定義）
+- **Harness（Step 1）と Online Evaluation（Step 5）**: デモの中で作る。デモ UI でも
+  コンソールでも CLI でも作れて、どの経路でも同じ設定になる
+  （`harness/harness.json` が単一の定義）
+
+エージェントは**名前の前方一致**（既定は `AsagaoSupportAgent`）で引き当てます。
+どの経路で作っても UI が自動的に見つけ、いちばん新しい READY のものを呼びます。
+作成に失敗しても直前のエージェントで会話を続けられます。
+IAM とロググループの後片付けも同じ前方一致に揃えてあるので、`AsagaoSupportAgentLive`
+のような接尾辞付きの名前でも権限と削除の対象に入ります。
 
 ## Step 1: 作る
 
-```bash
-./scripts/step1-create-agent.sh              # コンソール作成の伴走（貼り付け値を表示して READY まで待つ）
-STEP1_MODE=cli ./scripts/step1-create-agent.sh  # CreateHarness API で直接作成
-```
+デモ UI の「**エージェント設定**」タブを開き、名前・モデル・指示・ツール・メモリ・
+実行上限を確認して「**この設定でエージェントを作成**」を押します。
 
 - Harness はモデル・system prompt・Gateway ツール・Memory・実行上限を**設定として宣言するだけ**。
   コンテナもオーケストレーションコードも書かない
-- コンソールで作る場合もタグ `Project=agentcore-support-demo` を必ず付ける
-  （teardown が削除対象を特定する鍵）
-- READY 後にテスト質問を 1 回流す。コンソールの agent sandbox でも同じ質問を試せる
+- `CREATING` → `READY` はこの環境の実測で **約 2 分半〜3 分**（画面が自動で追従する）
+- READY になったら「**テスト実行**」でその場に 1 往復流せる。
+  コンソールの agent sandbox でも同じ質問を試せる
+- AWS コンソールのフォームで作る場合は、同じ画面の「AWS コンソールで作る場合」に
+  貼り付ける値（実行ロール ARN / モデル ID / Gateway ARN / system prompt / タグ）が
+  コピーボタン付きで並んでいる。**名前は `AsagaoSupportAgent` で始めること**、
+  **タグ `Project=agentcore-support-demo` を必ず付けること**（teardown が削除対象を
+  特定する鍵）
+- 表示される ARN は AWS アカウント ID を隠してある（コピーされる値は実物のまま）
+
+CLI で作る場合は `STEP1_MODE=cli ./scripts/step1-create-agent.sh`（事前練習用）。
 
 ## Step 2: 自社製品に繋ぐ
 
+デモ UI の「**AI アシスタント**」タブに切り替えます（Step 1 の画面からは
+「自社製品の画面へ →」でも移動できます）。UI の起動は事前に済ませておきます。
+
 ```bash
-./scripts/ui.sh
+./scripts/ui.sh   # 事前準備。以降ターミナルには戻らない
 ```
 
 `http://127.0.0.1:8788` を開きます。AWS リソースは追加しません（ローカルの FastAPI が
@@ -105,9 +133,11 @@ STEP1_MODE=cli ./scripts/step1-create-agent.sh  # CreateHarness API で直接作
 - **右ペイン（運用ビュー）**: 同じターンの裏側。モデル・ツール呼び出しの引数と結果・
   所要時間・first-token / total レイテンシ・in/out トークン・ターン比較テーブル。
   「裏側を隠す」で閉じられる
-- **ヘッダー**: モデルの切り替え（呼び出し時 override。Harness version は変わらない）、
-  session ID 表示、「新しい会話」
+- **ヘッダー**: 画面の切り替え（エージェント設定 / AI アシスタント）、モデルの切り替え
+  （呼び出し時 override。Harness version は変わらない）、session ID 表示、「新しい会話」
 - 同じ session ID のまま続けて質問すると会話が継続する（Memory）
+- 運用ビューの下端に **session ID のコピーボタン**と CloudWatch / Evaluations への
+  リンクがある（Step 4 でセッションを探すときに使う）
 
 フロントエンドを変更したら `UI_REBUILD=1 ./scripts/ui.sh` で再ビルドできます。
 
@@ -138,25 +168,39 @@ STEP1_MODE=cli ./scripts/step1-create-agent.sh  # CreateHarness API で直接作
 
 ## Step 4: 中身を見る
 
+運用ビューの「GenAI Observability ↗」から CloudWatch を開き、Bedrock AgentCore の
+Sessions / Traces で Step 3 の 2 セッションを見比べます（セッションは運用ビューの
+コピーボタンで取った session ID で特定できます）。スパン階層は
+agent → model → execute_tool → MCP → model の入れ子で、片方にはツール呼び出しの
+スパンが 2 つ連なり、もう片方には 1 つもありません。
+「なぜ答えが違ったのか」がモデルの中身を覗かなくてもトレースから特定でき、根本原因が
+**モデルの優劣ではなくツール説明文の品質**にあると分かります。
+
+同じ内容をターミナルで確認する CLI 版（事前練習用）:
+
 ```bash
 ./scripts/step4-traces.sh
 ```
 
-Step 3 の 2 セッションのスパン階層（agent → model → execute_tool → MCP → model）を並べます。
-片方にはツール呼び出しのスパンが 2 つ連なり、もう片方には 1 つもありません。
-「なぜ答えが違ったのか」がモデルの中身を覗かなくてもトレースから特定でき、根本原因が
-**モデルの優劣ではなくツール説明文の品質**にあると分かります。
-CloudWatch GenAI Observability のコンソール URL も出力します。
-
 ## Step 5: 仕組みにする
+
+AgentCore コンソールの **Evaluation → Create evaluation configuration** で、
+評価器（`GoalSuccessRate` / `Helpfulness` / `ToolSelectionAccuracy` /
+`ToolParameterAccuracy`）・データソース（Step 1 で作ったエージェントのエンドポイント、
+またはそのロググループ + サービス名）・サンプリング 100% ・実行ロール
+（スタック出力の `EvaluationRoleArn`）を指定して作成します。
+
+- **名前は `AsagaoSupportAgentEvaluation` で始めること**。実行ロールは結果用ロググループ
+  `/aws/bedrock-agentcore/evaluations/results/AsagaoSupportAgentEvaluation*` にだけ
+  書き込めるので、別の名前だと作成が `ValidationException` で落ちる
+- 採点は継続スケジュールで走るため反映まで数分かかる（この環境の実測では 8 分超）。
+  人前では**事前に採点済みのものを開く**
+
+CLI 版（事前練習用。作成 + 採点結果の表示）:
 
 ```bash
 ./scripts/step5-evaluations.sh
 ```
-
-Online Evaluation（`GoalSuccessRate` / `Helpfulness` / `ToolSelectionAccuracy` /
-`ToolParameterAccuracy`、サンプリング 100%）を作成し、直近セッションの採点結果を表示します。
-採点は継続スケジュールで走るため反映まで数分かかります（この環境の実測では 8 分超）。
 
 Step 4 の「人がトレースを見て気付く」を、「本番トラフィックを LLM-as-a-Judge が
 継続採点して落ちたら気付ける」に置き換えるのがこのステップです。改善（ツール説明文の修正）は
@@ -175,6 +219,9 @@ Gateway target の `toolOverrides` の description を直して `cdk deploy` す
 | trace が出ない | Transaction Search の有効化、`session.id`、IAM、log group |
 | 評価されない | invoke agent / inference / execute tool span と service name |
 | teardown が止まる | Harness → Evaluation → CDK stack の依存順 |
+| UI が「エージェントがまだありません」 | 名前が `AsagaoSupportAgent` で始まっているか（前方一致で探している） |
+| Memory の `ListEvents` が AccessDenied | 実行ロールの `memory/AsagaoSupportAgent*` の範囲に収まる名前か |
+| Evaluation 作成が `ValidationException` | 名前が `AsagaoSupportAgentEvaluation` で始まっているか |
 
 ## Teardown
 
@@ -196,20 +243,20 @@ teardown ではサービス固有の Get / List API で実在性を再確認し�
 
 ```text
 tools-api/            Lambda handler、fixture、OpenAPI 3.0、単体テスト
-harness/harness.json  Harness の定義（Step 1 のコンソール / CLI 両経路の単一ソース）
+harness/harness.json  Harness の定義（Step 1 の UI / コンソール / CLI 共通の単一ソース）
 gateway/              Gateway が公開する tool 一覧（表示用）
 observability/        invoke runner、Step 1〜5 の実装、teardown 検証
 scripts/
   common.sh           承認済みターゲット確認、見出し、前提チェック
   setup.sh            依存インストール → テスト → CDK deploy（土台のみ）
-  step1-create-agent.sh  Harness の作成（console 伴走 / STEP1_MODE=cli）
-  ui.sh               Step 2〜3 のデモ UI（ローカルのみ）
+  step1-create-agent.sh  Harness の作成（事前練習用。console 伴走 / STEP1_MODE=cli）
+  ui.sh               デモ UI（Step 1〜3 をブラウザで操作。ローカルのみ）
   step3-compare-models.sh / step4-traces.sh / step5-evaluations.sh
   measure-model-gap.sh   Step 3 の再現率を N 回試行して測る
   teardown.sh         削除と残存 0 件の検証
 frontend/             デモ UI のフロントエンド（Vite + React。ビルド成果物は dist/）
 server/               デモ UI のバックエンド（FastAPI。InvokeHarness を SSE に変換）
-chatui/               Harness のストリーミングクライアント（server が利用）
+chatui/               Harness のストリーミングクライアント + エージェント作成/検出（server が利用）
 infra/                TypeScript CDK app とテスト
 tests/                ストリーム解析、handler、サーバー、採点表示の単体テスト
 .demo.env.example     設定テンプレート（実値は git 管理外の .demo.env に置く）
@@ -223,9 +270,9 @@ TypeScript の AWS CDK を使用します。ローカルの CDK CLI が新しい
 GatewayTarget を CDK 管理下に置き、全対応リソースに `Project=agentcore-support-demo`
 タグを付けます。
 
-Harness と Online Evaluation はデモの筋書き上、CDK ではなくコンソール / CLI で作ります
-（Step 1 / Step 5）。teardown はこの 2 つをサービス API で削除してから
-`cdk destroy` を実行します。
+Harness と Online Evaluation はデモの筋書き上、CDK ではなく画面（デモ UI / コンソール）
+または CLI で作ります（Step 1 / Step 5）。teardown はこの 2 つをサービス API で
+名前の前方一致で削除してから `cdk destroy` を実行します。
 
 ## 既知の落とし穴
 
@@ -235,4 +282,10 @@ Harness と Online Evaluation はデモの筋書き上、CDK ではなくコン�
 - `create-harness` の後、`get-harness` が `READY` になるまでポーリングが必要
 - `CreateHarness` には `iam:PassRole` が必要
 - コンソールで Harness を作る場合、タグを付け忘れると teardown の削除対象から漏れる
+- 実行ロールの Memory 権限は `memory/<エージェント名の前方一致>*` にしておく。
+  `AsagaoSupportAgent-*` のようにハイフンで止めると、`AsagaoSupportAgentLive` の
+  managed Memory（`memory/AsagaoSupportAgentLive-xxxx`）に一致せず `ListEvents` で落ちる
+- 同じ理由で、Evaluation の結果用ロググループの権限もハイフンで止めない。
+  止めると `CreateOnlineEvaluationConfig` が「execution role does not have permissions
+  to create log group」で失敗する
 - 従来の Bedrock Agents（classic）とは別物であり、このデモでは使わない

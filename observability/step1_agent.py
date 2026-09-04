@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Step 1: Harness（エージェント本体）を作り、READY まで待つ。
+"""Step 1: Harness（エージェント本体）を作り、READY まで待つ（事前練習用の CLI 版）。
 
+本番のデモはデモ UI の「エージェント設定」タブ（`server/app.py` の POST /api/agent）で
+作るため、この経路は前日のリハーサルと再現性の実測に使う。
 既定はコンソール作成の伴走モード。ウィザードに貼る値を表示し、
 コンソールでの作成完了を検知して READY まで待つ。
 STEP1_MODE=cli なら CreateHarness API で同じ内容を直接作成する。

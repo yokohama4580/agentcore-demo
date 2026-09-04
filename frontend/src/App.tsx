@@ -1,15 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchConfig, fetchNewSession, streamChat } from "./api";
-import type { AppConfig, Turn } from "./types";
-import { Header } from "./Header";
+import {
+  createAgent,
+  fetchAgent,
+  fetchConfig,
+  fetchNewSession,
+  streamChat,
+} from "./api";
+import type { AgentState, AppConfig, Turn } from "./types";
+import { Header, type View } from "./Header";
 import { ChatPane } from "./ChatPane";
 import { OpsPane } from "./OpsPane";
+import { SetupPane } from "./SetupPane";
 
 let turnSeq = 0;
 
 export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [agent, setAgent] = useState<AgentState | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [view, setView] = useState<View>("setup");
   const [sessionId, setSessionId] = useState<string>("");
   const [modelId, setModelId] = useState<string | null>(null);
   const [showOps, setShowOps] = useState(true);
@@ -27,6 +38,46 @@ export default function App() {
       })
       .catch((e) => setConfigError(String(e)));
   }, []);
+
+  const refreshAgent = useCallback(async () => {
+    try {
+      setAgent(await fetchAgent(true));
+    } catch (e) {
+      setCreateError(String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAgent();
+  }, [refreshAgent]);
+
+  // 作成中と未作成のあいだだけポーリングする（コンソールで作った場合も拾う）
+  const status = agent?.current?.status ?? "NONE";
+  useEffect(() => {
+    if (status === "READY" && agent?.usable) return;
+    const timer = setInterval(() => void refreshAgent(), 6000);
+    return () => clearInterval(timer);
+  }, [status, agent?.usable, refreshAgent]);
+
+  const handleCreate = useCallback(
+    async (params: {
+      harnessName: string;
+      modelId: string;
+      systemPrompt: string;
+    }) => {
+      setCreating(true);
+      setCreateError(null);
+      try {
+        await createAgent(params);
+        await refreshAgent();
+      } catch (e) {
+        setCreateError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setCreating(false);
+      }
+    },
+    [refreshAgent],
+  );
 
   const resetSession = useCallback(async () => {
     const next = await fetchNewSession();
@@ -120,7 +171,11 @@ export default function App() {
           }
         }
       } catch (e) {
-        patchTurn(id, (t) => ({ ...t, streaming: false, error: String(e) }));
+        patchTurn(id, (t) => ({
+          ...t,
+          streaming: false,
+          error: e instanceof Error ? e.message : String(e),
+        }));
       } finally {
         patchTurn(id, (t) => ({ ...t, streaming: false }));
         setBusy(false);
@@ -143,9 +198,12 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${showOps ? "with-ops" : "no-ops"}`}>
+    <div className={`app ${view === "chat" && showOps ? "with-ops" : "no-ops"}`}>
       <Header
         config={config}
+        agent={agent}
+        view={view}
+        onViewChange={setView}
         sessionId={sessionId}
         modelId={modelId}
         onModelChange={setModelId}
@@ -154,10 +212,31 @@ export default function App() {
         onNewSession={resetSession}
         busy={busy}
       />
-      <main className="panes">
-        <ChatPane turns={turns} busy={busy} onSend={send} />
-        {showOps && <OpsPane turns={turns} config={config} />}
-      </main>
+      {view === "setup" ? (
+        <main className="setup-main">
+          <SetupPane
+            config={config}
+            agent={agent}
+            creating={creating}
+            createError={createError}
+            onCreate={handleCreate}
+            onRefresh={() => void refreshAgent()}
+            onGoChat={() => setView("chat")}
+          />
+        </main>
+      ) : (
+        <main className="panes">
+          <ChatPane turns={turns} busy={busy} onSend={send} />
+          {showOps && (
+            <OpsPane
+              turns={turns}
+              config={config}
+              agent={agent}
+              sessionId={sessionId}
+            />
+          )}
+        </main>
+      )}
     </div>
   );
 }

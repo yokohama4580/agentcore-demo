@@ -1,9 +1,34 @@
-import type { AppConfig, StreamEvent } from "./types";
+import type { Agent, AgentState, AppConfig, StreamEvent } from "./types";
 
 export async function fetchConfig(): Promise<AppConfig> {
   const res = await fetch("/api/config");
   if (!res.ok) throw new Error(`config: HTTP ${res.status}`);
   return res.json();
+}
+
+export async function fetchAgent(refresh = false): Promise<AgentState> {
+  const res = await fetch(`/api/agent${refresh ? "?refresh=1" : ""}`);
+  if (!res.ok) throw new Error(`agent: HTTP ${res.status}`);
+  return res.json();
+}
+
+export interface CreateAgentParams {
+  harnessName: string;
+  modelId: string;
+  systemPrompt: string;
+}
+
+export async function createAgent(params: CreateAgentParams): Promise<Agent> {
+  const res = await fetch("/api/agent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.detail ?? `agent: HTTP ${res.status}`);
+  }
+  return body as Agent;
 }
 
 export async function fetchNewSession(): Promise<string> {
@@ -28,7 +53,8 @@ export async function* streamChat(
     body: JSON.stringify(params),
   });
   if (!res.ok || !res.body) {
-    throw new Error(`chat: HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? `chat: HTTP ${res.status}`);
   }
 
   const reader = res.body.getReader();

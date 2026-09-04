@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
-import type { AppConfig, ToolCall, Turn } from "./types";
+import { useEffect, useRef, useState } from "react";
+import type { AgentState, AppConfig, ToolCall, Turn } from "./types";
 import { formatJson, modelLabel, shortToolName, toolLabel } from "./labels";
 
 interface Props {
   turns: Turn[];
   config: AppConfig;
+  agent: AgentState | null;
+  sessionId: string;
 }
 
 function ToolCard({ tool }: { tool: ToolCall }) {
@@ -123,8 +125,11 @@ function CompareTable({ turns }: { turns: Turn[] }) {
   );
 }
 
-export function OpsPane({ turns, config }: Props) {
+export function OpsPane({ turns, config, agent, sessionId }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+  const harness = agent?.usable ?? null;
+  const urls = agent?.consoleUrls ?? config.consoleUrls;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -152,22 +157,37 @@ export function OpsPane({ turns, config }: Props) {
       </div>
       <div className="ops-footer">
         <span className="ops-harness">
-          harness {config.harnessId} · v{config.harnessVersion}
+          {harness
+            ? `harness ${harness.harnessId} · v${harness.harnessVersion}`
+            : "harness 未検出"}
         </span>
-        <div className="ops-links">
-          <a
-            href={config.consoleUrls.genaiObservability}
-            target="_blank"
-            rel="noreferrer"
+        <div className="ops-session">
+          <code title={sessionId}>session {sessionId.slice(0, 13)}…</code>
+          <button
+            className="btn small"
+            onClick={() => {
+              navigator.clipboard?.writeText(sessionId);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
           >
+            {copied ? "コピーしました" : "セッション ID をコピー"}
+          </button>
+        </div>
+        <div className="ops-links">
+          <a href={urls.genaiObservability} target="_blank" rel="noreferrer">
             GenAI Observability ↗
           </a>
-          <a
-            href={config.consoleUrls.evaluations}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a href={urls.evaluations} target="_blank" rel="noreferrer">
             Evaluations ↗
+          </a>
+          {urls.harnessLogs && (
+            <a href={urls.harnessLogs} target="_blank" rel="noreferrer">
+              ログ ↗
+            </a>
+          )}
+          <a href={urls.dashboard} target="_blank" rel="noreferrer">
+            ダッシュボード ↗
           </a>
         </div>
       </div>

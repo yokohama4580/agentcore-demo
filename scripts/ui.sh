@@ -5,9 +5,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/scripts/common.sh"
 require_tools
-require_agent
+# Step 1 のエージェント作成も画面から行えるため、ここでは土台だけを要求する
+require_deployed
 
-section "STEP 2 - CONNECT YOUR PRODUCT (DEMO UI)"
+section "DEMO UI (STEP 1-3 をブラウザで操作する)"
 
 if [[ ! -d "${ROOT}/frontend/node_modules" ]]; then
   printf 'フロントエンドの依存をインストールします…\n'
@@ -24,8 +25,10 @@ fi
   "${PYTHON}" -m pip install --quiet 'fastapi>=0.115,<1' 'uvicorn>=0.32,<1'
 }
 
-printf 'Harness: %s\n' "${HARNESS_ID}"
-printf 'URL: http://127.0.0.1:8788\n\n'
+printf 'エージェント名: %s*（画面またはコンソールで作ったものを名前で引き当てます）\n' \
+  "${HARNESS_NAME}"
+printf 'URL: http://127.0.0.1:8788\n'
+printf 'デモ本番はこの URL と AWS コンソールだけで完結します（ターミナルは使いません）。\n\n'
 
 exec "${PYTHON}" -m uvicorn server.app:app \
   --host 127.0.0.1 \
