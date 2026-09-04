@@ -99,6 +99,7 @@ export interface TurnMetrics {
 
 export interface Turn {
   id: string;
+  sessionId: string;
   prompt: string;
   modelId: string | null;
   text: string;

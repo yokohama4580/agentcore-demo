@@ -25,6 +25,8 @@ export default function App() {
   const [modelId, setModelId] = useState<string | null>(null);
   const [showOps, setShowOps] = useState(true);
   const [turns, setTurns] = useState<Turn[]>([]);
+  // 運用ビューは会話をまたいでターンを保持する（モデル比較は会話を分けて行うため）
+  const [pastTurns, setPastTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
@@ -81,6 +83,7 @@ export default function App() {
 
   const resetSession = useCallback(async () => {
     const next = await fetchNewSession();
+    setPastTurns((prev) => [...prev, ...turnsRef.current]);
     setSessionId(next);
     setTurns([]);
   }, []);
@@ -95,6 +98,7 @@ export default function App() {
       const id = `turn-${++turnSeq}`;
       const turn: Turn = {
         id,
+        sessionId,
         prompt,
         modelId,
         text: "",
@@ -226,10 +230,14 @@ export default function App() {
         </main>
       ) : (
         <main className="panes">
-          <ChatPane turns={turns} busy={busy} onSend={send} />
+          <ChatPane
+            turns={[...pastTurns, ...turns]}
+            busy={busy}
+            onSend={send}
+          />
           {showOps && (
             <OpsPane
-              turns={turns}
+              turns={[...pastTurns, ...turns]}
               config={config}
               agent={agent}
               sessionId={sessionId}

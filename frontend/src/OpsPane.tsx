@@ -45,6 +45,14 @@ function ToolCard({ tool }: { tool: ToolCall }) {
   );
 }
 
+function conversationIndex(turns: Turn[], sessionId: string): number {
+  const order: string[] = [];
+  for (const turn of turns) {
+    if (!order.includes(turn.sessionId)) order.push(turn.sessionId);
+  }
+  return order.indexOf(sessionId) + 1;
+}
+
 function TurnBlock({ turn, index }: { turn: Turn; index: number }) {
   return (
     <div className="ops-turn">
@@ -97,6 +105,7 @@ function CompareTable({ turns }: { turns: Turn[] }) {
         <thead>
           <tr>
             <th>#</th>
+            <th>会話</th>
             <th>モデル</th>
             <th>ツール</th>
             <th>合計</th>
@@ -107,6 +116,7 @@ function CompareTable({ turns }: { turns: Turn[] }) {
           {finished.map((t) => (
             <tr key={t.id}>
               <td>{turns.indexOf(t) + 1}</td>
+              <td>{conversationIndex(turns, t.sessionId)}</td>
               <td>{t.modelId ? modelLabel(t.modelId) : "既定"}</td>
               <td>
                 {t.tools.map((tool) => shortToolName(tool.name)).join(", ") ||
@@ -151,7 +161,14 @@ export function OpsPane({ turns, config, agent, sessionId }: Props) {
           </p>
         )}
         {turns.map((turn, i) => (
-          <TurnBlock key={turn.id} turn={turn} index={i} />
+          <div key={turn.id}>
+            {i > 0 && turns[i - 1].sessionId !== turn.sessionId && (
+              <div className="ops-session-break">
+                新しい会話（会話 {conversationIndex(turns, turn.sessionId)}）
+              </div>
+            )}
+            <TurnBlock turn={turn} index={i} />
+          </div>
         ))}
         <CompareTable turns={turns} />
       </div>

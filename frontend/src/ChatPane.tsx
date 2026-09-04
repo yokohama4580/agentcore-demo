@@ -40,8 +40,12 @@ export function ChatPane({ turns, busy, onSend }: Props) {
             <p>注文・在庫・配送について質問できます。</p>
           </div>
         )}
-        {turns.map((turn) => (
-          <div key={turn.id} className="exchange">
+        {turns.map((turn, i) => (
+          <div key={turn.id}>
+            {i > 0 && turns[i - 1].sessionId !== turn.sessionId && (
+              <div className="chat-session-break">新しい会話</div>
+            )}
+            <div className="exchange">
             <div className="bubble user">{turn.prompt}</div>
             <div className={`bubble assistant ${turn.streaming ? "streaming" : ""}`}>
               {turn.tools.some((t) => t.finishedAt === null) && (
@@ -50,6 +54,7 @@ export function ChatPane({ turns, busy, onSend }: Props) {
               <Markdown text={turn.text} />
               {turn.streaming && <span className="caret" aria-hidden="true" />}
               {turn.error && <span className="chat-error">⚠ {turn.error}</span>}
+            </div>
             </div>
           </div>
         ))}

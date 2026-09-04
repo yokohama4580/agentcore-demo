@@ -135,7 +135,9 @@ CLI で作る場合は `STEP1_MODE=cli ./scripts/step1-create-agent.sh`（事前
   「裏側を隠す」で閉じられる
 - **ヘッダー**: 画面の切り替え（エージェント設定 / AI アシスタント）、モデルの切り替え
   （呼び出し時 override。Harness version は変わらない）、session ID 表示、「新しい会話」
-- 同じ session ID のまま続けて質問すると会話が継続する（Memory）
+- 同じ session ID のまま続けて質問すると会話が継続する（Memory）。「新しい会話」を押すと
+  session ID が変わるが、**画面のターンは消えず**、会話の区切り線が入る（Step 3 のモデル比較を
+  会話をまたいで見せるため）
 - 運用ビューの下端に **session ID のコピーボタン**と CloudWatch / Evaluations への
   リンクがある（Step 4 でセッションを探すときに使う）
 
@@ -143,8 +145,9 @@ CLI で作る場合は `STEP1_MODE=cli ./scripts/step1-create-agent.sh`（事前
 
 ## Step 3: 精度の壁に当たる
 
-デモ UI でチップ「**注文 A-100 の商品は、いま在庫がありますか？**」を、モデルを切り替えて
-2 回送ります（CLI 版は `./scripts/step3-compare-models.sh`）。
+デモ UI でチップ「**注文 A-100 の商品は、いま在庫がありますか？**」を送り、
+**「新しい会話」を押してから**モデルを切り替えて同じチップをもう一度送ります
+（CLI 版は `./scripts/step3-compare-models.sh`）。会話を分ける理由は下記のとおりです。
 
 この質問への正しい対応は「注文照会で SKU を特定 → 在庫照会」の **2 段のツール呼び出し**ですが、
 注文照会ツール（`inspect_order_lifecycle`）の説明文には「注文の明細（SKU）も返す」ことが
@@ -157,9 +160,16 @@ CLI で作る場合は `STEP1_MODE=cli ./scripts/step1-create-agent.sh`（事前
 同じエージェント・同じ質問なのに、モデルを切り替えると答えが変わります。しかも
 **どちらが正しいかは画面からは判定できません**。これが Step 4 への入口です。
 
+**会話は分けます。**同じ会話の中でモデルだけ切り替えると、直前のターンの「SKU が分からない」
+という回答が会話履歴に残り、次のモデルもそれを引き継いで同じ結論を返すことがあります
+（この環境で実測）。「新しい会話」を押すと session ID が変わり、モデルの違いだけを比べられます。
+顧客に見える画面と運用ビューはどちらも会話をまたいでターンを表示し続けるので、
+2 つの答えは並んだまま残ります（ターン比較表には「会話」列が出ます）。
+
 再現性のため、呼び出し時の model override は `temperature: 0.0` を指定しています。
 この環境の実測（temperature 0.0・新規セッション各 8 回）では、Haiku 4.5 は 8 回全てで
-タスク未完遂、Nova 2 Lite は 8 回全てで完遂でした。再現率を自分で測る場合
+タスク未完遂、Nova 2 Lite は 8 回全てで完遂でした（system prompt を日本語にした後の
+各 4 回でも 0/4 と 4/4 で同じ向きでした）。再現率を自分で測る場合
 （既定 各10回、`MODEL_GAP_RUNS` で変更可）:
 
 ```bash
@@ -288,4 +298,6 @@ Harness と Online Evaluation はデモの筋書き上、CDK ではなく画面�
 - 同じ理由で、Evaluation の結果用ロググループの権限もハイフンで止めない。
   止めると `CreateOnlineEvaluationConfig` が「execution role does not have permissions
   to create log group」で失敗する
+- 同じ名前のエージェントを削除直後に作り直すと、managed Memory の削除が終わるまで
+  `CREATE_FAILED`（`Memory with name ... already exists`）になる。数分待ってから作り直す
 - 従来の Bedrock Agents（classic）とは別物であり、このデモでは使わない

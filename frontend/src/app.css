@@ -920,3 +920,36 @@ body {
     grid-row: auto;
   }
 }
+
+.ops-session-break {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 20px 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ops-dim);
+}
+
+.ops-session-break::before,
+.ops-session-break::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed var(--ops-line);
+}
+
+.chat-session-break {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 18px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.chat-session-break::before,
+.chat-session-break::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line);
+}
